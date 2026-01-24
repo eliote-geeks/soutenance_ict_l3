@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,8 +25,9 @@ export const KPICard = ({
     
     const numericValue = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(numericValue)) {
-      setDisplayValue(value);
-      return;
+      // Use a ref pattern instead of setState in effect for non-numeric values
+      const timeoutId = setTimeout(() => setDisplayValue(value), 0);
+      return () => clearTimeout(timeoutId);
     }
 
     const duration = 1500;
@@ -47,12 +48,12 @@ export const KPICard = ({
     return () => clearInterval(timer);
   }, [value, isVisible, loading]);
 
-  const getTrendIcon = () => {
+  const TrendIcon = useMemo(() => {
     const numTrend = parseFloat(trend);
     if (numTrend > 0) return TrendingUp;
     if (numTrend < 0) return TrendingDown;
     return Minus;
-  };
+  }, [trend]);
 
   const getTrendColor = () => {
     const numTrend = parseFloat(trend);
