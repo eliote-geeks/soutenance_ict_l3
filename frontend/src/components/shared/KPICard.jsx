@@ -93,8 +93,6 @@ export const KPICard = ({
     }
   };
 
-  const TrendIcon = getTrendIcon();
-
   if (loading) {
     return (
       <div className={cn("kpi-card", getVariantStyles())}>
