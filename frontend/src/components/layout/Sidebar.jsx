@@ -12,11 +12,15 @@ import {
   Activity, 
   FileText,
   Shield,
+  Users,
+  User,
+  Settings,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Overview', priority: true },
@@ -32,14 +36,32 @@ const navItems = [
   { path: '/reports', icon: FileText, label: 'Reports' },
 ];
 
-export const Sidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
+const accountItems = [
+  { path: '/profile', icon: User, label: 'Profile' },
+  { path: '/users', icon: Users, label: 'Users', adminOnly: true },
+  { path: '/settings', icon: Settings, label: 'Settings' },
+];
+
+export const Sidebar = ({ collapsed, onToggle }) => {
+  const [localCollapsed, setLocalCollapsed] = useState(false);
+  const { user } = useAuth();
+  const isCollapsed = typeof collapsed === 'boolean' ? collapsed : localCollapsed;
+  const isAdmin = user?.role === 'admin';
+  const visibleAccountItems = accountItems.filter((item) => !item.adminOnly || isAdmin);
+
+  const handleToggle = () => {
+    if (onToggle) {
+      onToggle();
+      return;
+    }
+    setLocalCollapsed((prev) => !prev);
+  };
 
   return (
     <aside 
       className={cn(
         "fixed left-0 top-0 h-screen bg-card border-r border-border z-40 flex flex-col transition-all duration-300",
-        collapsed ? "w-[72px]" : "w-64"
+        isCollapsed ? "w-[72px]" : "w-64"
       )}
     >
       {/* Logo */}
@@ -47,7 +69,7 @@ export const Sidebar = () => {
         <div className="w-10 h-10 rounded-xl gradient-teal flex items-center justify-center flex-shrink-0 shadow-glow-teal">
           <Shield className="w-5 h-5 text-primary-foreground" />
         </div>
-        {!collapsed && (
+        {!isCollapsed && (
           <div className="animate-fade-in overflow-hidden">
             <h1 className="font-bold text-foreground leading-tight">ElasticGuard</h1>
             <span className="text-xs text-muted-foreground">AI Defense System</span>
@@ -56,8 +78,13 @@ export const Sidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar space-y-6">
         <div className="space-y-1">
+          {!isCollapsed && (
+            <p className="px-2 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+              Core
+            </p>
+          )}
           {navItems.map((item, index) => (
             <NavLink
               key={item.path}
@@ -73,16 +100,44 @@ export const Sidebar = () => {
                 "w-5 h-5 flex-shrink-0 transition-colors",
                 "group-hover:text-primary"
               )} />
-              {!collapsed && (
+              {!isCollapsed && (
                 <span className="truncate animate-fade-in">{item.label}</span>
               )}
-              {item.badge && !collapsed && (
+              {item.badge && !isCollapsed && (
                 <span className="ml-auto px-2 py-0.5 text-xs font-medium rounded-full bg-destructive/10 text-destructive">
                   3
                 </span>
               )}
-              {item.badge && collapsed && (
+              {item.badge && isCollapsed && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-destructive" />
+              )}
+            </NavLink>
+          ))}
+        </div>
+
+        <div className="space-y-1">
+          {!isCollapsed && (
+            <p className="px-2 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+              Account
+            </p>
+          )}
+          {visibleAccountItems.map((item, index) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => cn(
+                "sidebar-item relative group",
+                isActive && "active",
+                `stagger-${Math.min(index + 1, 6)}`
+              )}
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <item.icon className={cn(
+                "w-5 h-5 flex-shrink-0 transition-colors",
+                "group-hover:text-primary"
+              )} />
+              {!isCollapsed && (
+                <span className="truncate animate-fade-in">{item.label}</span>
               )}
             </NavLink>
           ))}
@@ -90,7 +145,7 @@ export const Sidebar = () => {
       </nav>
 
       {/* University branding */}
-      {!collapsed && (
+      {!isCollapsed && (
         <div className="p-4 border-t border-border">
           <div className="text-xs text-muted-foreground space-y-0.5">
             <p className="font-medium text-foreground/80">Université de Yaoundé I</p>
@@ -102,10 +157,10 @@ export const Sidebar = () => {
 
       {/* Collapse toggle */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={handleToggle}
         className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center hover:bg-accent transition-colors shadow-soft"
       >
-        {collapsed ? (
+        {isCollapsed ? (
           <ChevronRight className="w-3 h-3" />
         ) : (
           <ChevronLeft className="w-3 h-3" />

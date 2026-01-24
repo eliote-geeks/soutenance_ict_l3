@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff, LogOut, User, Users } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +26,8 @@ import { cn } from '@/lib/utils';
 
 export const TopBar = ({ sidebarCollapsed }) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isOnline, setIsOnline] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +46,11 @@ export const TopBar = ({ sidebarCollapsed }) => {
     if (seconds < 60) return `${seconds}s ago`;
     return `${Math.floor(seconds / 60)}m ago`;
   };
+
+  const initials = user?.name
+    ? user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+    : 'U';
+  const isAdmin = user?.role === 'admin';
 
   return (
     <header className={cn(
@@ -139,10 +149,50 @@ export const TopBar = ({ sidebarCollapsed }) => {
           )}
         </Button>
 
-        {/* Settings */}
-        <Button variant="ghost" size="icon">
-          <Settings className="w-4 h-4" />
-        </Button>
+        {/* User menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-9 px-2 gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden md:flex flex-col items-start text-left leading-tight">
+                <span className="text-xs font-semibold text-foreground">{user?.name}</span>
+                <span className="text-[11px] text-muted-foreground">{user?.role}</span>
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/profile')}>
+              <User className="w-4 h-4" />
+              Profile
+            </DropdownMenuItem>
+            {isAdmin && (
+              <DropdownMenuItem onClick={() => navigate('/users')}>
+                <Users className="w-4 h-4" />
+                Users
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <Settings className="w-4 h-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                logout();
+                navigate('/login');
+              }}
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
