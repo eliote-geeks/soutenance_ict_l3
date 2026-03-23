@@ -9,7 +9,9 @@ import {
   ChevronDown,
   MoreHorizontal,
   Search,
-  User
+  User,
+  BrainCircuit,
+  Fingerprint
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,15 +44,18 @@ import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchAlerts, acknowledgeAlert, isolateHost, blockIP, createTicket } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function AlertsPage() {
+  const { scopeKey } = useScope();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterSourceType, setFilterSourceType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -68,7 +73,7 @@ export default function AlertsPage() {
     loadData();
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scopeKey]);
 
   const handleAcknowledge = async (alertId) => {
     try {
@@ -112,6 +117,7 @@ export default function AlertsPage() {
   const filteredAlerts = alerts.filter(alert => {
     if (filterSeverity !== 'all' && alert.severity !== filterSeverity) return false;
     if (filterStatus !== 'all' && alert.status !== filterStatus) return false;
+    if (filterSourceType !== 'all' && alert.sourceType !== filterSourceType) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -141,6 +147,10 @@ export default function AlertsPage() {
     low: alerts.filter(a => a.severity === 'low').length,
   };
 
+  const confidenceLabel = (value) => (
+    typeof value === 'number' ? `${Math.round(value * 100)}%` : '--'
+  );
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -161,7 +171,7 @@ export default function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Alerts</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage and respond to security alerts
+            Manage detections, validate anomalies and apply remediation playbooks
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -218,6 +228,17 @@ export default function AlertsPage() {
           </SelectContent>
         </Select>
 
+        <Select value={filterSourceType} onValueChange={setFilterSourceType}>
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Detection" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="heuristic">Heuristic</SelectItem>
+            <SelectItem value="ml">ML</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Button variant="outline" size="icon" className="ml-auto">
           <Filter className="w-4 h-4" />
         </Button>
@@ -254,6 +275,10 @@ export default function AlertsPage() {
                     </span>
                     <SeverityBadge severity={alert.severity} />
                     <StatusBadge status={alert.status} />
+                    <Badge variant="outline" className="gap-1">
+                      <BrainCircuit className="w-3 h-3" />
+                      {alert.sourceType === 'ml' ? 'ML' : 'Heuristic'}
+                    </Badge>
                   </div>
                   <h3 className="font-medium text-foreground truncate">
                     {alert.title}
@@ -264,6 +289,8 @@ export default function AlertsPage() {
                     <span>{alert.hostname}</span>
                     <span className="hidden sm:inline">•</span>
                     <span className="hidden sm:inline">{alert.mitreTactic}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="hidden sm:inline">Confidence {confidenceLabel(alert.confidence)}</span>
                   </div>
                 </div>
                 
@@ -274,6 +301,9 @@ export default function AlertsPage() {
                     <span className="text-sm">
                       {alert.assignee || 'Unassigned'}
                     </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    {confidenceLabel(alert.confidence)}
                   </div>
                   <span className="text-xs text-muted-foreground">
                     {formatTimestamp(alert.timestamp)}
@@ -342,6 +372,14 @@ export default function AlertsPage() {
               <div className="grid grid-cols-2 gap-4 py-4">
                 <div className="space-y-3">
                   <div>
+                    <span className="text-xs text-muted-foreground">Detection source</span>
+                    <p className="text-sm">{selectedAlert.sourceType === 'ml' ? 'Machine learning' : 'Heuristic rule'}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Confidence</span>
+                    <p className="text-sm font-mono">{confidenceLabel(selectedAlert.confidence)}</p>
+                  </div>
+                  <div>
                     <span className="text-xs text-muted-foreground">Source IP</span>
                     <p className="font-mono text-sm">{selectedAlert.sourceIP}</p>
                   </div>
@@ -353,8 +391,21 @@ export default function AlertsPage() {
                     <span className="text-xs text-muted-foreground">Hostname</span>
                     <p className="font-mono text-sm">{selectedAlert.hostname}</p>
                   </div>
+                  {selectedAlert.recommendation && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Recommended action</span>
+                      <p className="text-sm">{selectedAlert.recommendation}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-3">
+                  <div>
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Fingerprint className="w-3 h-3" />
+                      Signature
+                    </span>
+                    <p className="font-mono text-sm break-all">{selectedAlert.signature || '--'}</p>
+                  </div>
                   <div>
                     <span className="text-xs text-muted-foreground">MITRE ATT&CK</span>
                     <p className="text-sm">{selectedAlert.mitreTactic}</p>
@@ -367,6 +418,12 @@ export default function AlertsPage() {
                     <span className="text-xs text-muted-foreground">Assignee</span>
                     <p className="text-sm">{selectedAlert.assignee || 'Unassigned'}</p>
                   </div>
+                  {selectedAlert.playbook && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Playbook</span>
+                      <p className="text-sm">{selectedAlert.playbook}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               

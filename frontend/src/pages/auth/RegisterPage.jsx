@@ -34,7 +34,7 @@ export default function RegisterPage() {
     try {
       await register({ name: form.name, email: form.email, password: form.password });
       toast.success('Account created.', {
-        description: 'Welcome to ElasticGuard AI dashboard.',
+        description: 'Welcome to NetSentinel AI.',
       });
       navigate('/', { replace: true });
     } catch (error) {
@@ -51,7 +51,7 @@ export default function RegisterPage() {
       <CardHeader>
         <CardTitle className="text-2xl">Create account</CardTitle>
         <CardDescription>
-          Join the ElasticGuard cyber defense workspace.
+          Join the NetSentinel AI cyber defense workspace.
         </CardDescription>
       </CardHeader>
       <CardContent>

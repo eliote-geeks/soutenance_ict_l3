@@ -8,19 +8,24 @@ import { SparklineChart } from '@/components/charts/SparklineChart';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchOverview } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
 export default function OverviewPage() {
+  const { scopeKey } = useScope();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const result = await fetchOverview();
         setData(result);
+        setError('');
       } catch (error) {
         console.error('Failed to load overview data:', error);
+        setError("Impossible de charger l'overview pour le moment.");
       } finally {
         setLoading(false);
       }
@@ -29,7 +34,7 @@ export default function OverviewPage() {
     loadData();
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scopeKey]);
 
   if (loading) {
     return (
@@ -47,6 +52,26 @@ export default function OverviewPage() {
     );
   }
 
+  if (!data) {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">SOC Overview</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Unified view of Filebeat, Packetbeat, fail2ban and AI detections
+          </p>
+        </div>
+        <Card className="border-border/50 shadow-soft">
+          <CardContent className="py-8">
+            <div className="text-sm text-destructive font-medium">
+              {error || "Aucune donnee d'overview disponible."}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const { kpis, trafficData, riskyHosts, attackingIPs, anomalyScore } = data;
 
   return (
@@ -54,14 +79,14 @@ export default function OverviewPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Security Overview</h1>
+          <h1 className="text-2xl font-bold text-foreground">SOC Overview</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Real-time threat monitoring and anomaly detection
+            Unified view of Filebeat, Packetbeat, fail2ban and AI detections
           </p>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
           <span className="status-dot pulse bg-primary" />
-          <span className="text-sm font-medium text-primary">AI Model Active</span>
+            <span className="text-sm font-medium text-primary">AI Inference Active</span>
         </div>
       </div>
 
@@ -111,7 +136,7 @@ export default function OverviewPage() {
         <Card className="lg:col-span-2 border-border/50 shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-semibold">
-              Live Traffic Stream
+              Packetbeat Traffic Stream
             </CardTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="status-dot pulse bg-success" />

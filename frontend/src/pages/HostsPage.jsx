@@ -24,10 +24,12 @@ import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchHosts, isolateHost } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function HostsPage() {
+  const { scopeKey } = useScope();
   const [hosts, setHosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,7 +51,7 @@ export default function HostsPage() {
     loadData();
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scopeKey]);
 
   const handleIsolate = async (hostname) => {
     try {
@@ -121,7 +123,7 @@ export default function HostsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Assets & Hosts</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Inventory of monitored hosts and their security status
+            Inventory of monitored servers, agents and exposed services
           </p>
         </div>
         <Button variant="outline" className="gap-2">

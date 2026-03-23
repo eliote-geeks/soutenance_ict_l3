@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff, LogOut, User, Users } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ import { cn } from '@/lib/utils';
 export const TopBar = ({ sidebarCollapsed }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { scope, setScope, options } = useScope();
   const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isOnline, setIsOnline] = useState(true);
@@ -51,6 +53,8 @@ export const TopBar = ({ sidebarCollapsed }) => {
     ? user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
   const isAdmin = user?.role === 'admin';
+  const scopeProfiles = Array.isArray(options.profiles) ? options.profiles : [];
+  const scopeAssets = Array.isArray(options.assets) ? options.assets : [];
 
   return (
     <header className={cn(
@@ -80,6 +84,61 @@ export const TopBar = ({ sidebarCollapsed }) => {
             <SelectItem value="lab">Lab</SelectItem>
           </SelectContent>
         </Select>
+
+        <Select
+          value={scope.mode}
+          onValueChange={(value) => setScope((prev) => ({
+            ...prev,
+            mode: value,
+            profileId: value === 'profile' ? (prev.profileId || scopeProfiles[0]?.id || '') : '',
+            assetId: value === 'asset' ? (prev.assetId || scopeAssets[0]?.id || '') : '',
+          }))}
+        >
+          <SelectTrigger className="w-28 h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Assets</SelectItem>
+            <SelectItem value="profile">Profile</SelectItem>
+            <SelectItem value="asset">Asset</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {scope.mode === 'profile' && (
+          <Select
+            value={scope.profileId || (scopeProfiles[0]?.id ?? '')}
+            onValueChange={(value) => setScope((prev) => ({ ...prev, profileId: value }))}
+          >
+            <SelectTrigger className="w-44 h-8 text-xs">
+              <SelectValue placeholder="Select profile" />
+            </SelectTrigger>
+            <SelectContent>
+              {scopeProfiles.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  {profile.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {scope.mode === 'asset' && (
+          <Select
+            value={scope.assetId || (scopeAssets[0]?.id ?? '')}
+            onValueChange={(value) => setScope((prev) => ({ ...prev, assetId: value }))}
+          >
+            <SelectTrigger className="w-44 h-8 text-xs">
+              <SelectValue placeholder="Select asset" />
+            </SelectTrigger>
+            <SelectContent>
+              {scopeAssets.map((asset) => (
+                <SelectItem key={asset.id} value={asset.id}>
+                  {asset.hostname}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Badge variant="outline" className="h-7 px-2.5 gap-1.5 cursor-pointer hover:bg-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-destructive" />

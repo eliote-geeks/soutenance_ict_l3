@@ -21,13 +21,13 @@ export const AuthLayout = () => {
             <Shield className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">ElasticGuard</h1>
-            <p className="text-xs text-muted-foreground">AI Defense System</p>
+            <h1 className="text-xl font-bold text-foreground">NetSentinel AI</h1>
+            <p className="text-xs text-muted-foreground">Elastic + IA Security Lab</p>
           </div>
         </div>
         <Outlet />
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Demo workspace for Universite de Yaounde I - Network specialty
+          Workspace de soutenance UY1 - Detection d'intrusions et anomalies reseau
         </p>
       </div>
     </div>

@@ -3,8 +3,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 const AuthContext = createContext();
 
 const STORAGE_KEYS = {
-  users: 'elasticguard-users',
-  session: 'elasticguard-session',
+  users: 'netsentinel-users',
+  session: 'netsentinel-session',
 };
 
 const DEFAULT_USERS = [

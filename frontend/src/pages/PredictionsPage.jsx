@@ -6,9 +6,11 @@ import { Progress } from '@/components/ui/progress';
 import { PredictionChart } from '@/components/charts/PredictionChart';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchPredictions } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
 export default function PredictionsPage() {
+  const { scopeKey } = useScope();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +29,7 @@ export default function PredictionsPage() {
     loadData();
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scopeKey]);
 
   if (loading) {
     return (
@@ -54,9 +56,9 @@ export default function PredictionsPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Predictions</h1>
+          <h1 className="text-2xl font-bold text-foreground">Risk Forecast</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            AI-powered threat forecasting and risk assessment
+            Forecast attack pressure and anticipate escalation windows
           </p>
         </div>
         <div className="flex items-center gap-3">

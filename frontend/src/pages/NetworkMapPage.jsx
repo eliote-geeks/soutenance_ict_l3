@@ -132,7 +132,7 @@ export default function NetworkMapPage() {
       .attr('dy', 25)
       .attr('font-size', '10px')
       .attr('fill', 'hsl(var(--foreground))')
-      .attr('font-family', 'Space Grotesk');
+      .attr('font-family', 'Manrope');
 
     // Zoom behavior
     const zoomBehavior = d3.zoom()
@@ -171,9 +171,9 @@ export default function NetworkMapPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Network Map</h1>
+          <h1 className="text-2xl font-bold text-foreground">Network Flows</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Visualize network topology and traffic flows
+            Visualize suspicious flows and lateral movement candidates
           </p>
         </div>
       </div>
@@ -183,7 +183,7 @@ export default function NetworkMapPage() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Network className="w-4 h-4 text-primary" />
-            Network Topology
+            Network Topology and Suspicious Flows
           </CardTitle>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">

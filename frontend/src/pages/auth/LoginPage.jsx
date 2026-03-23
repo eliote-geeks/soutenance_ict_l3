@@ -26,7 +26,7 @@ export default function LoginPage() {
     try {
       await login({ email, password, remember });
       toast.success('Welcome back.', {
-        description: 'Session ready for ElasticGuard AI dashboard.',
+        description: 'Session ready for NetSentinel AI.',
       });
       navigate(redirectTo, { replace: true });
     } catch (error) {
@@ -43,7 +43,7 @@ export default function LoginPage() {
       <CardHeader>
         <CardTitle className="text-2xl">Sign in</CardTitle>
         <CardDescription>
-          Access the ElasticGuard workspace for real-time cyber defense.
+          Access the NetSentinel AI workspace for real-time cyber defense.
         </CardDescription>
       </CardHeader>
       <CardContent>

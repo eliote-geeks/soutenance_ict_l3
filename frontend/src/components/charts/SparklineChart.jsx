@@ -1,27 +1,26 @@
-import { Line, LineChart, ResponsiveContainer } from 'recharts';
+import { Line, LineChart } from 'recharts';
 
 export const SparklineChart = ({ 
   data, 
   color = 'hsl(var(--primary))', 
   height = 40,
-  width = 100 
+  width = 200 
 }) => {
-  const chartData = data.map((value, index) => ({ value, index }));
+  const chartData = Array.isArray(data) ? data.map((value, index) => ({ value, index })) : [];
 
   return (
-    <div style={{ width, height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={1.5}
-            dot={false}
-            animationDuration={1000}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+    <div style={{ width, height, minWidth: width }}>
+      <LineChart width={width} height={height} data={chartData}>
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={1.5}
+          dot={false}
+          animationDuration={1000}
+          isAnimationActive
+        />
+      </LineChart>
     </div>
   );
 };

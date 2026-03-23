@@ -19,9 +19,11 @@ import {
 } from '@/components/ui/collapsible';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchLogs } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
 export default function LogsExplorerPage() {
+  const { scopeKey } = useScope();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedLog, setExpandedLog] = useState(null);
@@ -43,7 +45,7 @@ export default function LogsExplorerPage() {
     };
 
     loadData();
-  }, [timeRange, logLevel]);
+  }, [timeRange, logLevel, scopeKey]);
 
   const addFilterChip = (type, value) => {
     const chip = { type, value, id: Date.now() };
@@ -107,9 +109,9 @@ export default function LogsExplorerPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Logs Explorer</h1>
+          <h1 className="text-2xl font-bold text-foreground">Elastic Logs</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Search and analyze security event logs
+            Search indexed logs from authentication, system, firewall and network traffic
           </p>
         </div>
         <Button variant="outline" className="gap-2">
@@ -215,7 +217,16 @@ export default function LogsExplorerPage() {
       <Card className="border-border/50 shadow-soft">
         <CardContent className="p-0">
           <ScrollArea className="h-[600px]">
-            <div className="divide-y divide-border">
+            <div className="min-w-[860px]">
+              <div className="grid grid-cols-[24px_150px_76px_220px_minmax(0,1fr)] gap-4 px-4 py-3 border-b border-border/70 bg-muted/20 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span />
+                <span>Timestamp</span>
+                <span>Level</span>
+                <span>Source</span>
+                <span>Message</span>
+              </div>
+
+              <div className="divide-y divide-border">
               {filteredLogs.map((log, index) => (
                 <Collapsible
                   key={log.id}
@@ -225,13 +236,13 @@ export default function LogsExplorerPage() {
                   <CollapsibleTrigger asChild>
                     <div
                       className={cn(
-                        "flex items-start gap-4 p-4 hover:bg-muted/30 transition-colors cursor-pointer",
+                        "grid grid-cols-[24px_150px_76px_220px_minmax(0,1fr)] gap-4 px-4 py-4 hover:bg-muted/30 transition-colors cursor-pointer items-start",
                         "opacity-0 animate-slide-up"
                       )}
                       style={{ animationDelay: `${Math.min(index * 20, 500)}ms` }}
                     >
                       {/* Expand icon */}
-                      <div className="flex-shrink-0 mt-0.5">
+                      <div className="mt-0.5">
                         {expandedLog === log.id ? (
                           <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         ) : (
@@ -240,16 +251,16 @@ export default function LogsExplorerPage() {
                       </div>
 
                       {/* Timestamp */}
-                      <div className="flex-shrink-0 w-36">
-                        <span className="font-mono text-xs text-muted-foreground">
+                      <div className="min-w-0">
+                        <span className="block font-mono text-xs text-muted-foreground truncate">
                           {formatTimestamp(log.timestamp)}
                         </span>
                       </div>
 
                       {/* Level */}
-                      <div className="flex-shrink-0 w-16">
+                      <div className="min-w-0">
                         <span className={cn(
-                          "px-2 py-0.5 rounded text-xs font-medium",
+                          "inline-flex px-2 py-0.5 rounded text-xs font-medium",
                           getLevelColor(log.level)
                         )}>
                           {log.level}
@@ -257,21 +268,22 @@ export default function LogsExplorerPage() {
                       </div>
 
                       {/* Source */}
-                      <div className="flex-shrink-0 w-32">
+                      <div className="min-w-0">
                         <span 
-                          className="font-mono text-xs text-primary cursor-pointer hover:underline"
+                          className="block font-mono text-xs text-primary cursor-pointer hover:underline truncate"
                           onClick={(e) => {
                             e.stopPropagation();
                             addFilterChip('source', log.source);
                           }}
+                          title={log.source}
                         >
                           {log.source}
                         </span>
                       </div>
 
                       {/* Message */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground truncate">
+                      <div className="min-w-0">
+                        <p className="text-sm text-foreground truncate leading-6" title={log.message}>
                           {log.message}
                         </p>
                       </div>
@@ -312,6 +324,7 @@ export default function LogsExplorerPage() {
                   </CollapsibleContent>
                 </Collapsible>
               ))}
+              </div>
             </div>
           </ScrollArea>
         </CardContent>

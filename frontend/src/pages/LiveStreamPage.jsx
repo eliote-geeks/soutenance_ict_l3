@@ -8,9 +8,11 @@ import { RealtimeChart } from '@/components/charts/RealtimeChart';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchStream } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
 export default function LiveStreamPage() {
+  const { scopeKey } = useScope();
   const [data, setData] = useState({ events: [], metrics: {} });
   const [loading, setLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
@@ -57,7 +59,7 @@ export default function LiveStreamPage() {
     loadData();
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
-  }, [isPaused, buffer]);
+  }, [isPaused, buffer, scopeKey]);
 
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp);
@@ -89,9 +91,9 @@ export default function LiveStreamPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Live Stream</h1>
+          <h1 className="text-2xl font-bold text-foreground">Telemetry Stream</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Real-time security event feed and metrics
+            Live event feed from Packetbeat, Filebeat and fail2ban
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { 
   AlertTriangle, 
   Clock, 
-  Users, 
-  ChevronRight,
-  Shield,
-  Target
+  Target,
+  Layers3,
+  Radar
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchIncidents } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
 // Simple MITRE ATT&CK tactics for matrix view
@@ -33,6 +33,7 @@ const mitreTactics = [
 ];
 
 export default function IncidentsPage() {
+  const { scopeKey } = useScope();
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState(null);
@@ -55,7 +56,7 @@ export default function IncidentsPage() {
     loadData();
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scopeKey]);
 
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp);
@@ -66,6 +67,10 @@ export default function IncidentsPage() {
       minute: '2-digit',
     });
   };
+
+  const scopeLabel = (scopeType) => (
+    scopeType === 'campaign' ? 'Campaign' : 'Single source'
+  );
 
   if (loading) {
     return (
@@ -85,7 +90,7 @@ export default function IncidentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Incidents</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Track and investigate security incidents
+            Group alerts into incidents and track containment decisions
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -129,6 +134,16 @@ export default function IncidentsPage() {
                     <h3 className="font-medium text-sm mb-2 line-clamp-2">
                       {incident.title}
                     </h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="gap-1 text-[11px]">
+                        <Layers3 className="w-3 h-3" />
+                        {incident.familyLabel || 'Incident'}
+                      </Badge>
+                      <Badge variant="outline" className="gap-1 text-[11px]">
+                        <Radar className="w-3 h-3" />
+                        {scopeLabel(incident.scopeType)}
+                      </Badge>
+                    </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <StatusBadge status={incident.status} />
                       <span className="flex items-center gap-1">
@@ -180,6 +195,22 @@ export default function IncidentsPage() {
                     <span className="text-xs text-muted-foreground">Created</span>
                     <p className="text-sm font-medium">{formatTimestamp(selectedIncident.createdAt)}</p>
                   </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <Badge variant="outline" className="gap-1">
+                    <Layers3 className="w-3 h-3" />
+                    {selectedIncident.familyLabel || 'Incident family'}
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    <Radar className="w-3 h-3" />
+                    {scopeLabel(selectedIncident.scopeType)}
+                  </Badge>
+                  {selectedIncident.primarySource && (
+                    <Badge variant="outline" className="font-mono">
+                      {selectedIncident.primarySource}
+                    </Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>

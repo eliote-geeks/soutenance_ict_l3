@@ -23,16 +23,16 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Overview', priority: true },
-  { path: '/stream', icon: Radio, label: 'Live Stream', priority: true },
-  { path: '/logs', icon: FileSearch, label: 'Logs Explorer' },
+  { path: '/', icon: LayoutDashboard, label: 'SOC Overview', priority: true },
+  { path: '/stream', icon: Radio, label: 'Telemetry Stream', priority: true },
+  { path: '/logs', icon: FileSearch, label: 'Elastic Logs' },
   { path: '/alerts', icon: Bell, label: 'Alerts', priority: true, badge: true },
   { path: '/incidents', icon: AlertTriangle, label: 'Incidents' },
   { path: '/hosts', icon: Server, label: 'Assets/Hosts' },
-  { path: '/network', icon: Network, label: 'Network Map' },
-  { path: '/model', icon: Brain, label: 'Model & AI' },
-  { path: '/predictions', icon: TrendingUp, label: 'Predictions', priority: true },
-  { path: '/pipeline', icon: Activity, label: 'Pipeline Health' },
+  { path: '/network', icon: Network, label: 'Network Flows' },
+  { path: '/model', icon: Brain, label: 'AI Detection' },
+  { path: '/predictions', icon: TrendingUp, label: 'Risk Forecast', priority: true },
+  { path: '/pipeline', icon: Activity, label: 'Stack Health' },
   { path: '/reports', icon: FileText, label: 'Reports' },
 ];
 
@@ -71,8 +71,8 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         </div>
         {!isCollapsed && (
           <div className="animate-fade-in overflow-hidden">
-            <h1 className="font-bold text-foreground leading-tight">ElasticGuard</h1>
-            <span className="text-xs text-muted-foreground">AI Defense System</span>
+            <h1 className="font-bold text-foreground leading-tight">NetSentinel AI</h1>
+            <span className="text-xs text-muted-foreground">Elastic + IA Security Lab</span>
           </div>
         )}
       </div>

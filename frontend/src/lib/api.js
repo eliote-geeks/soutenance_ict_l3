@@ -1,5 +1,5 @@
-// API Layer for ElasticGuard AI Dashboard
-// Currently uses mock data, can be connected to real backend
+// API layer for NetSentinel AI.
+// Mock mode stays available for UI-only work on low-resource machines.
 
 import {
   generateOverviewKPIs,
@@ -18,14 +18,46 @@ import {
   generateLogs,
 } from './mockData';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API_BASE = `${BACKEND_URL}/api`;
+const SCOPE_STORAGE_KEY = 'netsentinel-scope';
 
 // Simulate network delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Flag to use mock data (set to false when backend is ready)
-const USE_MOCK = true;
+const USE_MOCK = process.env.REACT_APP_USE_MOCK === 'true';
+
+const getStoredScope = () => {
+  if (typeof window === 'undefined') {
+    return { mode: 'all', profileId: '', assetId: '' };
+  }
+  try {
+    return JSON.parse(window.localStorage.getItem(SCOPE_STORAGE_KEY) || '{"mode":"all","profileId":"","assetId":""}');
+  } catch (error) {
+    return { mode: 'all', profileId: '', assetId: '' };
+  }
+};
+
+const appendScopeParams = (path) => {
+  const scope = getStoredScope();
+  const url = new URL(path, 'http://netsentinel.local');
+  if (scope.mode === 'profile' && scope.profileId) {
+    url.searchParams.set('profile_id', scope.profileId);
+  }
+  if (scope.mode === 'asset' && scope.assetId) {
+    url.searchParams.set('asset_id', scope.assetId);
+  }
+  return `${url.pathname}${url.search}`;
+};
+
+const fetchJson = async (path, options) => {
+  const scopedPath = appendScopeParams(path);
+  const response = await fetch(`${API_BASE}${scopedPath}`, options);
+  if (!response.ok) {
+    throw new Error(`API request failed with status ${response.status}`);
+  }
+  return response.json();
+};
 
 // API Functions
 export const fetchOverview = async () => {
@@ -40,8 +72,7 @@ export const fetchOverview = async () => {
     };
   }
   
-  const response = await fetch(`${API_BASE}/overview`);
-  return response.json();
+  return fetchJson('/overview');
 };
 
 export const fetchStream = async () => {
@@ -53,8 +84,7 @@ export const fetchStream = async () => {
     };
   }
   
-  const response = await fetch(`${API_BASE}/stream`);
-  return response.json();
+  return fetchJson('/stream');
 };
 
 export const fetchLogs = async (filters = {}) => {
@@ -69,8 +99,7 @@ export const fetchLogs = async (filters = {}) => {
   }
   
   const params = new URLSearchParams(filters);
-  const response = await fetch(`${API_BASE}/logs?${params}`);
-  return response.json();
+  return fetchJson(`/logs?${params}`);
 };
 
 export const fetchAlerts = async (filters = {}) => {
@@ -83,8 +112,7 @@ export const fetchAlerts = async (filters = {}) => {
   }
   
   const params = new URLSearchParams(filters);
-  const response = await fetch(`${API_BASE}/alerts?${params}`);
-  return response.json();
+  return fetchJson(`/alerts?${params}`);
 };
 
 export const fetchIncidents = async () => {
@@ -95,8 +123,7 @@ export const fetchIncidents = async () => {
     };
   }
   
-  const response = await fetch(`${API_BASE}/incidents`);
-  return response.json();
+  return fetchJson('/incidents');
 };
 
 export const fetchHosts = async () => {
@@ -107,8 +134,7 @@ export const fetchHosts = async () => {
     };
   }
   
-  const response = await fetch(`${API_BASE}/hosts`);
-  return response.json();
+  return fetchJson('/hosts');
 };
 
 export const fetchModel = async () => {
@@ -117,8 +143,7 @@ export const fetchModel = async () => {
     return generateModelMetrics();
   }
   
-  const response = await fetch(`${API_BASE}/model`);
-  return response.json();
+  return fetchJson('/model');
 };
 
 export const fetchPredictions = async () => {
@@ -127,8 +152,7 @@ export const fetchPredictions = async () => {
     return generatePredictions();
   }
   
-  const response = await fetch(`${API_BASE}/predictions`);
-  return response.json();
+  return fetchJson('/predictions');
 };
 
 export const fetchPipeline = async () => {
@@ -137,7 +161,18 @@ export const fetchPipeline = async () => {
     return generatePipelineHealth();
   }
   
-  const response = await fetch(`${API_BASE}/pipeline`);
+  return fetchJson('/pipeline');
+};
+
+export const fetchScopeOptions = async () => {
+  if (USE_MOCK) {
+    await delay(200);
+    return { profiles: [], assets: [], assignments: [] };
+  }
+  const response = await fetch(`${API_BASE}/scope/options`);
+  if (!response.ok) {
+    throw new Error(`API request failed with status ${response.status}`);
+  }
   return response.json();
 };
 
@@ -148,10 +183,9 @@ export const acknowledgeAlert = async (alertId) => {
     return { success: true, alertId };
   }
   
-  const response = await fetch(`${API_BASE}/alerts/${alertId}/acknowledge`, {
+  return fetchJson(`/alerts/${alertId}/acknowledge`, {
     method: 'POST',
   });
-  return response.json();
 };
 
 export const isolateHost = async (hostId) => {
@@ -160,10 +194,9 @@ export const isolateHost = async (hostId) => {
     return { success: true, hostId };
   }
   
-  const response = await fetch(`${API_BASE}/hosts/${hostId}/isolate`, {
+  return fetchJson(`/hosts/${hostId}/isolate`, {
     method: 'POST',
   });
-  return response.json();
 };
 
 export const blockIP = async (ip) => {
@@ -172,12 +205,11 @@ export const blockIP = async (ip) => {
     return { success: true, ip };
   }
   
-  const response = await fetch(`${API_BASE}/firewall/block`, {
+  return fetchJson('/firewall/block', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ip }),
   });
-  return response.json();
 };
 
 export const createTicket = async (alertId, data) => {
@@ -186,12 +218,11 @@ export const createTicket = async (alertId, data) => {
     return { success: true, ticketId: `TKT-${Date.now()}` };
   }
   
-  const response = await fetch(`${API_BASE}/tickets`, {
+  return fetchJson('/tickets', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ alertId, ...data }),
   });
-  return response.json();
 };
 
 export const exportReport = async (type, filters) => {
@@ -201,10 +232,9 @@ export const exportReport = async (type, filters) => {
     return { success: true, downloadUrl: '#' };
   }
   
-  const response = await fetch(`${API_BASE}/reports/export`, {
+  return fetchJson('/reports/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type, filters }),
   });
-  return response.json();
 };

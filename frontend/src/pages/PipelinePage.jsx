@@ -6,9 +6,11 @@ import { Progress } from '@/components/ui/progress';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { fetchPipeline } from '@/lib/api';
+import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
 export default function PipelinePage() {
+  const { scopeKey } = useScope();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +29,7 @@ export default function PipelinePage() {
     loadData();
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scopeKey]);
 
   if (loading) {
     return (
@@ -49,9 +51,9 @@ export default function PipelinePage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Pipeline Health</h1>
+          <h1 className="text-2xl font-bold text-foreground">Stack Health</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Monitor data ingestion and processing pipeline
+            Monitor collectors, Elasticsearch, API and the external AI service
           </p>
         </div>
         <div className="flex items-center gap-2">

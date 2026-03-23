@@ -136,7 +136,7 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">User Management</h1>
           <p className="text-sm text-muted-foreground">
-            Manage access, roles, and account status for the ElasticGuard workspace.
+            Manage access, roles, and account status for the NetSentinel AI workspace.
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>

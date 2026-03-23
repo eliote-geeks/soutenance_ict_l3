@@ -1,5 +1,5 @@
-// Mock Data Generator for ElasticGuard AI Dashboard
-// Simulates realistic cybersecurity data
+// Mock data generator for NetSentinel AI.
+// Simulates realistic telemetry from Filebeat, Packetbeat and fail2ban.
 
 const randomIP = () => {
   const octets = [

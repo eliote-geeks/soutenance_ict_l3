@@ -1,0 +1,46 @@
+{
+  "published": {
+    "f8e9da4fd65c9b107bcc227f00713e11f9cdeac837b8ec63933ccb50d66424c2": {
+      "last_published_at": "2026-03-22T04:22:41.445874+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "10.42.0.216",
+      "hostname": "vps-64194ecd"
+    },
+    "2398519da3fbd294ada432ee44680b956269b89cdb5c2a732ceebc768ea2dae6": {
+      "last_published_at": "2026-03-22T04:22:46.983600+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "10.42.0.4",
+      "hostname": "vps-64194ecd"
+    },
+    "b9bbb6580c828c8f6dbe05117088b328979bf19bb4d20a27cac69397aed83a96": {
+      "last_published_at": "2026-03-22T04:22:53.089561+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "79.137.32.27",
+      "hostname": "vps-64194ecd"
+    },
+    "8174acdd6b6f79f071e8fe0bd1f53c7677dc1a6e6d5d72a3f5c5665e3b8771a5": {
+      "last_published_at": "2026-03-22T04:22:57.939070+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "10.42.0.61",
+      "hostname": "vps-64194ecd"
+    },
+    "46c151ea9c1a40ffad87b7587ca71017138d2b94a656f9572d68f1d17fb5038a": {
+      "last_published_at": "2026-03-22T04:23:02.217760+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "127.0.0.1",
+      "hostname": "vps-64194ecd"
+    },
+    "eaf97eecb3ac29ca787826ec728347a82179faf8ef4b4b826c0da8e331b599c5": {
+      "last_published_at": "2026-03-22T04:23:07.761582+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "10.42.0.45",
+      "hostname": "vps-64194ecd"
+    },
+    "2bc06c1febf2f15638da3892470c41b792922bd16a9d9d689435ce5568e801a6": {
+      "last_published_at": "2026-03-22T04:23:13.186294+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "10.42.0.1",
+      "hostname": "vps-64194ecd"
+    }
+  }
+}
