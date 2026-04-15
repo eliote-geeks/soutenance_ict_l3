@@ -364,6 +364,9 @@ Et il est aussi pousse sur GitHub :
 
 ## Documentation supplementaire
 
+Le dossier `docs/` est reserve a la documentation NetSentinel.  
+Les anciens documents sans lien direct avec le projet ont ete retires.
+
 - [EXPLICATION_PROJET_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/EXPLICATION_PROJET_NETSENTINEL.md)
 - [PROCEDE_MISE_EN_PLACE_NETSENTINEL_SOUTENANCE.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/PROCEDE_MISE_EN_PLACE_NETSENTINEL_SOUTENANCE.md)
 - [RAPPORT_ETAT_AVANCEMENT_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/RAPPORT_ETAT_AVANCEMENT_NETSENTINEL.md)
