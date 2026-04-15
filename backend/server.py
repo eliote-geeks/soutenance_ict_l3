@@ -8,7 +8,7 @@ from typing import Any
 import uuid
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 import requests
 from starlette.middleware.cors import CORSMiddleware
@@ -44,6 +44,10 @@ INGEST_AI_ALERTS_INDEX = os.environ.get("INGEST_AI_ALERTS_INDEX", "ai-alerts-man
 PROFILES_INDEX = os.environ.get("PROFILES_INDEX", "netsentinel-profiles")
 ASSETS_INDEX = os.environ.get("ASSETS_INDEX", "netsentinel-assets")
 PROFILE_ASSETS_INDEX = os.environ.get("PROFILE_ASSETS_INDEX", "netsentinel-profile-assets")
+AGENT_TOKENS_INDEX = os.environ.get("AGENT_TOKENS_INDEX", "netsentinel-agent-enrollment-tokens")
+AGENT_INSTANCES_INDEX = os.environ.get("AGENT_INSTANCES_INDEX", "netsentinel-agent-instances")
+ADMIN_API_SECRET = os.environ.get("ADMIN_API_SECRET", "netsentinel-admin-dev-secret")
+NETSENTINEL_API_URL = os.environ.get("NETSENTINEL_API_URL", "http://127.0.0.1:8010").rstrip("/")
 
 
 def allowed_origins() -> list[str]:
@@ -315,6 +319,134 @@ def fetch_index_documents(index: str, size: int = 200) -> list[dict[str, Any]]:
             source["id"] = source.get("id") or hit.get("_id")
         documents.append(source)
     return documents
+
+
+def require_agent_storage() -> None:
+    if not elastic_configured():
+        raise HTTPException(status_code=503, detail="Agent enrollment requires Elasticsearch storage.")
+
+
+def hash_agent_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
+
+
+def assert_admin_secret(provided_secret: str | None) -> None:
+    if not provided_secret or provided_secret != ADMIN_API_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid admin secret.")
+
+
+def token_expired(document: dict[str, Any]) -> bool:
+    expires_at = document.get("expires_at")
+    if not expires_at:
+        return False
+    return parse_dt(expires_at) <= now_utc()
+
+
+def fetch_agent_enrollment_tokens() -> list[dict[str, Any]]:
+    return fetch_index_documents(AGENT_TOKENS_INDEX, size=500)
+
+
+def fetch_agent_instances() -> list[dict[str, Any]]:
+    return fetch_index_documents(AGENT_INSTANCES_INDEX, size=500)
+
+
+def find_agent_enrollment_token(raw_token: str) -> dict[str, Any] | None:
+    hashed = hash_agent_token(raw_token)
+    for token in fetch_agent_enrollment_tokens():
+        if token.get("token_hash") == hashed:
+            return token
+    return None
+
+
+def find_agent_instance(instance_id: str) -> dict[str, Any] | None:
+    return next((item for item in fetch_agent_instances() if item.get("id") == instance_id), None)
+
+
+def agent_elastic_auth_payload() -> dict[str, Any]:
+    payload: dict[str, Any] = {"url": ELASTICSEARCH_URL}
+    if ELASTICSEARCH_API_KEY:
+        payload["api_key"] = ELASTICSEARCH_API_KEY
+    elif ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD:
+        payload["username"] = ELASTICSEARCH_USERNAME
+        payload["password"] = ELASTICSEARCH_PASSWORD
+    else:
+        raise HTTPException(status_code=503, detail="Elastic agent credentials are not configured.")
+    return payload
+
+
+def ensure_asset_document(
+    *,
+    asset_id: str,
+    hostname: str,
+    ip: str,
+    os_name: str,
+    role: str,
+    site: str,
+    environment: str,
+) -> dict[str, Any]:
+    existing = next((item for item in fetch_assets_metadata() if item.get("id") == asset_id), None)
+    if existing:
+        return existing
+    document = {
+        "id": asset_id,
+        "hostname": hostname,
+        "host_id": asset_id,
+        "ip": ip,
+        "os": os_name,
+        "role": role,
+        "site": site,
+        "environment": environment,
+        "tags": ["netsentinel-agent", role, environment],
+        "created_at": iso(now_utc()),
+    }
+    elastic_index_doc(ASSETS_INDEX, asset_id, document)
+    return document
+
+
+def ensure_profile_asset_assignment(profile_id: str | None, asset_id: str) -> None:
+    if not profile_id:
+        return
+    link_id = f"{profile_id}__{asset_id}"
+    if any(item.get("id") == link_id for item in fetch_profile_asset_links()):
+        return
+    elastic_index_doc(
+        PROFILE_ASSETS_INDEX,
+        link_id,
+        {
+            "id": link_id,
+            "profile_id": profile_id,
+            "asset_id": asset_id,
+            "created_at": iso(now_utc()),
+        },
+    )
+
+
+def build_agent_activation(instance: dict[str, Any]) -> dict[str, Any]:
+    asset_id = normalize_text(instance.get("asset_id"), "").strip()
+    if not asset_id:
+        raise HTTPException(status_code=400, detail="Agent instance is missing an asset_id.")
+    asset = next((item for item in fetch_assets_metadata() if item.get("id") == asset_id), None) or {}
+    return {
+        "agent": {
+            "instance_id": instance.get("id"),
+            "status": instance.get("status"),
+            "approved_at": instance.get("approved_at"),
+        },
+        "asset": {
+            "id": asset_id,
+            "hostname": asset.get("hostname") or instance.get("hostname"),
+            "ip": asset.get("ip") or instance.get("ip"),
+            "os": asset.get("os") or instance.get("os"),
+            "role": asset.get("role") or instance.get("role") or "workstation",
+            "site": asset.get("site") or instance.get("site") or "default-site",
+            "environment": asset.get("environment") or instance.get("environment") or "prod",
+            "profile_id": instance.get("profile_id"),
+        },
+        "elastic": agent_elastic_auth_payload(),
+        "server": {
+            "api_url": NETSENTINEL_API_URL,
+        },
+    }
 
 
 def normalize_text(value: Any, default: str = "unknown") -> str:
@@ -1435,6 +1567,38 @@ class ProfileAssetCreateRequest(BaseModel):
     asset_id: str
 
 
+class AgentEnrollmentTokenCreateRequest(BaseModel):
+    asset_id: str
+    profile_id: str | None = None
+    site: str = "default-site"
+    role: str = "workstation"
+    environment: str = "prod"
+    expires_in_minutes: int = 30
+    single_use: bool = True
+
+
+class AgentEnrollRequest(BaseModel):
+    token: str
+    hostname: str
+    ip: str
+    os: str
+    agent_version: str = "0.1.0"
+
+
+class AgentCheckinRequest(BaseModel):
+    instance_id: str
+    hostname: str | None = None
+    ip: str | None = None
+    os: str | None = None
+    activation_applied: bool = False
+
+
+class AgentHeartbeatRequest(BaseModel):
+    instance_id: str
+    service_state: str = "running"
+    last_error: str | None = None
+
+
 @api_router.get("/")
 async def root():
     return {
@@ -1507,6 +1671,14 @@ async def assets():
     assets_payload = fetch_assets_metadata()
     links = fetch_profile_asset_links()
     profile_lookup = {item.get("id"): item for item in fetch_profiles_metadata()}
+    agent_lookup: dict[str, dict[str, Any]] = {}
+    for instance in fetch_agent_instances() if elastic_configured() else []:
+        asset_key = normalize_text(instance.get("asset_id"), "")
+        if not asset_key:
+            continue
+        current = agent_lookup.get(asset_key)
+        if not current or parse_dt(instance.get("last_seen_at")) >= parse_dt(current.get("last_seen_at")):
+            agent_lookup[asset_key] = instance
     profiles_by_asset: dict[str, list[dict[str, Any]]] = {}
     for link in links:
         asset_profiles = profiles_by_asset.setdefault(link.get("asset_id"), [])
@@ -1518,6 +1690,9 @@ async def assets():
             {
                 **item,
                 "profiles": profiles_by_asset.get(item.get("id"), []),
+                "agentStatus": (agent_lookup.get(item.get("id")) or {}).get("status", "inactive"),
+                "agentLastSeenAt": (agent_lookup.get(item.get("id")) or {}).get("last_seen_at"),
+                "agentInstanceId": (agent_lookup.get(item.get("id")) or {}).get("id"),
             }
             for item in assets_payload
         ]
@@ -1553,6 +1728,206 @@ async def assign_profile_asset(request: ProfileAssetCreateRequest):
     }
     stored = elastic_index_doc(PROFILE_ASSETS_INDEX, link_id, document) if elastic_configured() else False
     return {"success": stored or not elastic_configured(), "assignment": document}
+
+
+@api_router.post("/agent/enrollment-tokens")
+async def create_agent_enrollment_token(
+    request: AgentEnrollmentTokenCreateRequest,
+    x_admin_secret: str | None = Header(default=None),
+):
+    require_agent_storage()
+    assert_admin_secret(x_admin_secret)
+    token_id = f"token_{uuid.uuid4().hex[:12]}"
+    raw_token = f"nst_{uuid.uuid4().hex}{uuid.uuid4().hex[:8]}"
+    document = {
+        "id": token_id,
+        "token_hash": hash_agent_token(raw_token),
+        "asset_id": request.asset_id,
+        "profile_id": request.profile_id,
+        "site": request.site,
+        "role": request.role,
+        "environment": request.environment,
+        "single_use": request.single_use,
+        "status": "active",
+        "created_at": iso(now_utc()),
+        "expires_at": iso(now_utc() + timedelta(minutes=max(1, request.expires_in_minutes))),
+    }
+    elastic_index_doc(AGENT_TOKENS_INDEX, token_id, document)
+    return {
+        "success": True,
+        "token": {
+            **document,
+            "raw_token": raw_token,
+        },
+    }
+
+
+@api_router.get("/agent/enrollment-tokens")
+async def list_agent_enrollment_tokens(x_admin_secret: str | None = Header(default=None)):
+    require_agent_storage()
+    assert_admin_secret(x_admin_secret)
+    tokens = []
+    for token in fetch_agent_enrollment_tokens():
+        tokens.append(
+            {
+                **token,
+                "expired": token_expired(token),
+            }
+        )
+    return {"tokens": tokens}
+
+
+@api_router.post("/agent/enrollment-tokens/{token_id}/revoke")
+async def revoke_agent_enrollment_token(token_id: str, x_admin_secret: str | None = Header(default=None)):
+    require_agent_storage()
+    assert_admin_secret(x_admin_secret)
+    token = next((item for item in fetch_agent_enrollment_tokens() if item.get("id") == token_id), None)
+    if not token:
+        raise HTTPException(status_code=404, detail="Enrollment token not found.")
+    token["status"] = "revoked"
+    token["revoked_at"] = iso(now_utc())
+    elastic_index_doc(AGENT_TOKENS_INDEX, token_id, token)
+    return {"success": True, "token": token}
+
+
+@api_router.get("/agent/instances")
+async def list_agent_instances(x_admin_secret: str | None = Header(default=None)):
+    require_agent_storage()
+    assert_admin_secret(x_admin_secret)
+    return {"instances": fetch_agent_instances()}
+
+
+@api_router.post("/agent/enroll")
+async def enroll_agent(request: AgentEnrollRequest):
+    require_agent_storage()
+    token = find_agent_enrollment_token(request.token)
+    if not token:
+        raise HTTPException(status_code=404, detail="Enrollment token not found.")
+    if token.get("status") == "revoked":
+        raise HTTPException(status_code=403, detail="Enrollment token revoked.")
+    if token_expired(token):
+        raise HTTPException(status_code=403, detail="Enrollment token expired.")
+    if token.get("single_use") and token.get("claimed_by_instance_id"):
+        raise HTTPException(status_code=409, detail="Enrollment token already used.")
+
+    instance_id = f"agent_{uuid.uuid4().hex[:12]}"
+    instance = {
+        "id": instance_id,
+        "token_id": token.get("id"),
+        "asset_id": token.get("asset_id"),
+        "profile_id": token.get("profile_id"),
+        "site": token.get("site") or "default-site",
+        "role": token.get("role") or "workstation",
+        "environment": token.get("environment") or "prod",
+        "hostname": request.hostname,
+        "ip": request.ip,
+        "os": request.os,
+        "agent_version": request.agent_version,
+        "status": "pending_approval",
+        "created_at": iso(now_utc()),
+        "last_seen_at": iso(now_utc()),
+    }
+    elastic_index_doc(AGENT_INSTANCES_INDEX, instance_id, instance)
+    token["status"] = "claimed"
+    token["claimed_at"] = iso(now_utc())
+    token["claimed_by_instance_id"] = instance_id
+    elastic_index_doc(AGENT_TOKENS_INDEX, normalize_text(token.get("id"), token.get("id")), token)
+    return {
+        "success": True,
+        "instance": {
+            "id": instance_id,
+            "status": instance["status"],
+            "asset_id": instance["asset_id"],
+            "profile_id": instance["profile_id"],
+        },
+        "message": "Enrollment request received. Waiting for admin approval.",
+    }
+
+
+@api_router.post("/agent/instances/{instance_id}/approve")
+async def approve_agent_instance(instance_id: str, x_admin_secret: str | None = Header(default=None)):
+    require_agent_storage()
+    assert_admin_secret(x_admin_secret)
+    instance = find_agent_instance(instance_id)
+    if not instance:
+        raise HTTPException(status_code=404, detail="Agent instance not found.")
+
+    ensure_asset_document(
+        asset_id=normalize_text(instance.get("asset_id"), instance_id),
+        hostname=normalize_text(instance.get("hostname"), instance_id),
+        ip=normalize_text(instance.get("ip"), "127.0.0.1"),
+        os_name=normalize_text(instance.get("os"), "Unknown"),
+        role=normalize_text(instance.get("role"), "workstation"),
+        site=normalize_text(instance.get("site"), "default-site"),
+        environment=normalize_text(instance.get("environment"), "prod"),
+    )
+    ensure_profile_asset_assignment(instance.get("profile_id"), normalize_text(instance.get("asset_id"), instance_id))
+
+    instance["status"] = "approved"
+    instance["approved_at"] = iso(now_utc())
+    instance["last_seen_at"] = iso(now_utc())
+    elastic_index_doc(AGENT_INSTANCES_INDEX, instance_id, instance)
+    return {"success": True, "instance": instance, "activation": build_agent_activation(instance)}
+
+
+@api_router.post("/agent/checkin")
+async def agent_checkin(request: AgentCheckinRequest):
+    require_agent_storage()
+    instance = find_agent_instance(request.instance_id)
+    if not instance:
+        raise HTTPException(status_code=404, detail="Agent instance not found.")
+
+    if request.hostname:
+        instance["hostname"] = request.hostname
+    if request.ip:
+        instance["ip"] = request.ip
+    if request.os:
+        instance["os"] = request.os
+    instance["last_seen_at"] = iso(now_utc())
+
+    status = normalize_text(instance.get("status"), "pending_approval")
+    if status == "approved" and request.activation_applied:
+        instance["status"] = "active"
+        instance["activated_at"] = iso(now_utc())
+        status = "active"
+    elastic_index_doc(AGENT_INSTANCES_INDEX, request.instance_id, instance)
+
+    response: dict[str, Any] = {
+        "success": True,
+        "instance": {
+            "id": instance.get("id"),
+            "status": status,
+            "asset_id": instance.get("asset_id"),
+        },
+    }
+    if status in {"approved", "active"}:
+        response["activation"] = build_agent_activation(instance)
+        response["message"] = "Apply activation payload locally." if status == "approved" else "Agent active."
+    else:
+        response["message"] = "Enrollment pending admin approval."
+    return response
+
+
+@api_router.post("/agent/heartbeat")
+async def agent_heartbeat(request: AgentHeartbeatRequest):
+    require_agent_storage()
+    instance = find_agent_instance(request.instance_id)
+    if not instance:
+        raise HTTPException(status_code=404, detail="Agent instance not found.")
+    instance["last_seen_at"] = iso(now_utc())
+    instance["service_state"] = request.service_state
+    if request.last_error:
+        instance["last_error"] = request.last_error
+    elastic_index_doc(AGENT_INSTANCES_INDEX, request.instance_id, instance)
+    return {
+        "success": True,
+        "instance": {
+            "id": instance.get("id"),
+            "status": instance.get("status"),
+            "last_seen_at": instance.get("last_seen_at"),
+            "service_state": instance.get("service_state"),
+        },
+    }
 
 
 @api_router.get("/overview")
