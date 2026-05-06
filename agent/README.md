@@ -6,7 +6,7 @@ Agent installable pour rattacher une machine a NetSentinel avec un flux controle
 
 Version courante :
 
-- `1.1.0`
+- `1.2.0`
 
 Le principe:
 - l'agent peut etre distribue publiquement
@@ -64,6 +64,11 @@ curl -X POST http://79.137.32.27:8010/api/agent/instances/agent_xxxxx/approve \
 
 5. l'agent applique la configuration recue, ecrit les configs Beats, puis passe en `active`
 
+6. apres activation, un runtime local tourne en continu :
+- il remonte des signaux utiles aux heuristiques
+- il ecrit des snapshots NDJSON pour Filebeat
+- il recoit d'eventuelles actions locales approuvees par l'admin
+
 Si l'approbation arrive plus tard, relancer simplement:
 
 Linux:
@@ -92,6 +97,7 @@ Le script Linux:
 - installe `Filebeat`, `Packetbeat`, `Metricbeat`
 - ecrit les fichiers de config
 - active les services quand l'instance est approuvee
+- lance aussi un runtime local `ns_agent_runtime.py`
 - stocke son etat dans `/etc/netsentinel-agent/agent.json`
 
 Mode direct encore supporte:
@@ -114,6 +120,7 @@ Le script Windows est maintenant one-click :
 - il telecharge automatiquement les paquets Beats Elastic ;
 - il ecrit les configs apres approbation ;
 - il installe les services Windows `Filebeat`, `Packetbeat`, `Metricbeat` ;
+- il enregistre une tache planifiee de runtime local ;
 - il stocke son etat dans `C:\Program Files\NetSentinelAgent\agent.json` ;
 - il remonte un heartbeat avec etat `running` ou `error`.
 
@@ -146,6 +153,36 @@ Agent:
 - `POST /api/agent/enroll`
 - `POST /api/agent/checkin`
 - `POST /api/agent/heartbeat`
+
+Actions locales:
+- `POST /api/agent/instances/{instance_id}/actions`
+
+Actions supportees:
+- `block_ip`
+- `unblock_ip`
+- `terminate_process_by_name`
+- `terminate_process_by_pid`
+- `collect_triage`
+
+## Signaux locaux remontes
+
+Le runtime local remonte maintenant notamment :
+- `failed_login_indicators`
+- `privilege_indicators`
+- `defense_evasion_indicators`
+- `phishing_indicators`
+- `suspicious_archive_hits`
+- `internal_remote_service_hits`
+- `external_destinations`
+- `external_established_connections`
+- `listening_ports`
+- `suspicious_processes`
+
+Ces signaux sont :
+- envoyes au backend via `heartbeat`
+- ecrits localement en `NDJSON`
+- collectes par `Filebeat`
+- reutilisables par les heuristiques IA et le `RandomForest`
 
 ## Etat cote application
 

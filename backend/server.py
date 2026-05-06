@@ -9,6 +9,14 @@ from fastapi import APIRouter, FastAPI, Header, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 
 try:
+    from .ns_agent import (
+        apply_agent_action_results,
+        build_local_action_policy,
+        build_runtime_config,
+        pending_agent_actions,
+        queue_agent_action,
+        sanitize_agent_signals,
+    )
     from .ns_analytics import (
         aggregate_packetbeat_traffic,
         ai_findings,
@@ -66,6 +74,7 @@ try:
     from .ns_schemas import (
         AIFindingIngest,
         AgentCheckinRequest,
+        AgentCommandCreateRequest,
         AgentEnrollmentTokenCreateRequest,
         AgentEnrollRequest,
         AgentHeartbeatRequest,
@@ -78,6 +87,14 @@ try:
         TicketRequest,
     )
 except ImportError:
+    from ns_agent import (
+        apply_agent_action_results,
+        build_local_action_policy,
+        build_runtime_config,
+        pending_agent_actions,
+        queue_agent_action,
+        sanitize_agent_signals,
+    )
     from ns_analytics import (
         aggregate_packetbeat_traffic,
         ai_findings,
@@ -135,6 +152,7 @@ except ImportError:
     from ns_schemas import (
         AIFindingIngest,
         AgentCheckinRequest,
+        AgentCommandCreateRequest,
         AgentEnrollmentTokenCreateRequest,
         AgentEnrollRequest,
         AgentHeartbeatRequest,
@@ -330,6 +348,8 @@ def build_agent_activation(instance: dict[str, Any]) -> dict[str, Any]:
         },
         "elastic": agent_elastic_auth_payload(),
         "server": {"api_url": NETSENTINEL_API_URL},
+        "runtime": build_runtime_config(instance.get("os")),
+        "local_actions": build_local_action_policy(),
     }
 
 
@@ -686,6 +706,8 @@ async def approve_agent_instance(instance_id: str, x_admin_secret: str | None = 
     instance["status"] = "approved"
     instance["approved_at"] = iso(now_utc())
     instance["last_seen_at"] = iso(now_utc())
+    instance["local_action_policy"] = build_local_action_policy()
+    instance["runtime"] = build_runtime_config(instance.get("os"))
     elastic_index_doc(AGENT_INSTANCES_INDEX, instance_id, instance)
     return {"success": True, "instance": instance, "activation": build_agent_activation(instance)}
 
@@ -721,6 +743,28 @@ async def disable_agent_instance(instance_id: str, request: AgentInstanceActionR
     return {"success": True, "instance": instance}
 
 
+@api_router.post("/agent/instances/{instance_id}/actions")
+async def queue_agent_instance_action(instance_id: str, request: AgentCommandCreateRequest, x_admin_secret: str | None = Header(default=None)):
+    require_agent_storage()
+    assert_admin_secret(x_admin_secret)
+    instance = find_agent_instance(instance_id)
+    if not instance:
+        raise HTTPException(status_code=404, detail="Agent instance not found.")
+    if normalize_text(instance.get("status"), "pending_approval") not in {"approved", "active"}:
+        raise HTTPException(status_code=409, detail="Only approved or active agents can receive local actions.")
+    try:
+        action = queue_agent_action(
+            instance,
+            action_type=request.action_type,
+            parameters=request.parameters,
+            reason=request.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    elastic_index_doc(AGENT_INSTANCES_INDEX, instance_id, instance)
+    return {"success": True, "action": action, "pendingActions": pending_agent_actions(instance)}
+
+
 @api_router.post("/agent/checkin")
 async def agent_checkin(request: AgentCheckinRequest):
     require_agent_storage()
@@ -734,6 +778,8 @@ async def agent_checkin(request: AgentCheckinRequest):
         instance["ip"] = request.ip
     if request.os:
         instance["os"] = request.os
+    if request.capabilities:
+        instance["capabilities"] = request.capabilities
     instance["last_seen_at"] = iso(now_utc())
 
     status = normalize_text(instance.get("status"), "pending_approval")
@@ -764,6 +810,7 @@ async def agent_checkin(request: AgentCheckinRequest):
     response = {
         "success": True,
         "instance": {"id": instance.get("id"), "status": status, "asset_id": instance.get("asset_id")},
+        "pending_actions": pending_agent_actions(instance) if status in {"approved", "active"} else [],
     }
     if status in {"approved", "active"}:
         response["activation"] = build_agent_activation(instance)
@@ -783,8 +830,22 @@ async def agent_heartbeat(request: AgentHeartbeatRequest):
     instance["service_state"] = request.service_state
     if request.last_error:
         instance["last_error"] = request.last_error
+    if request.signals:
+        instance["last_signals"] = sanitize_agent_signals(request.signals)
+        instance["last_signals_at"] = iso(now_utc())
+    applied_results = apply_agent_action_results(instance, request.action_results)
     elastic_index_doc(AGENT_INSTANCES_INDEX, request.instance_id, instance)
-    return {"success": True, "instance": {"id": instance.get("id"), "status": instance.get("status"), "last_seen_at": instance.get("last_seen_at"), "service_state": instance.get("service_state")}}
+    return {
+        "success": True,
+        "instance": {
+            "id": instance.get("id"),
+            "status": instance.get("status"),
+            "last_seen_at": instance.get("last_seen_at"),
+            "service_state": instance.get("service_state"),
+        },
+        "pending_actions": pending_agent_actions(instance),
+        "applied_action_results": applied_results,
+    }
 
 
 @api_router.get("/overview")

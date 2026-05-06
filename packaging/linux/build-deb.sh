@@ -7,7 +7,7 @@ PACKAGE_NAME="netsentinel-agent"
 BUILD_DIR="$ROOT_DIR/dist/${PACKAGE_NAME}_${VERSION}_amd64"
 
 rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR/DEBIAN" "$BUILD_DIR/usr/local/bin" "$BUILD_DIR/usr/share/doc/netsentinel-agent"
+mkdir -p "$BUILD_DIR/DEBIAN" "$BUILD_DIR/usr/local/bin" "$BUILD_DIR/usr/share/doc/netsentinel-agent" "$BUILD_DIR/usr/share/netsentinel-agent"
 
 cat >"$BUILD_DIR/DEBIAN/control" <<EOF
 Package: $PACKAGE_NAME
@@ -23,6 +23,7 @@ Description: NetSentinel Agent bootstrap for Linux hosts
 EOF
 
 install -m 0755 "$ROOT_DIR/agent/install-linux.sh" "$BUILD_DIR/usr/local/bin/netsentinel-agent-install"
+install -m 0755 "$ROOT_DIR/agent/ns_agent_runtime.py" "$BUILD_DIR/usr/share/netsentinel-agent/ns_agent_runtime.py"
 install -m 0644 "$ROOT_DIR/agent/README.md" "$BUILD_DIR/usr/share/doc/netsentinel-agent/README.md"
 install -m 0644 "$ROOT_DIR/agent/VERSION" "$BUILD_DIR/usr/share/doc/netsentinel-agent/VERSION"
 

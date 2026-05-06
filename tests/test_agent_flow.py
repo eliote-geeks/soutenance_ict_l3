@@ -158,20 +158,62 @@ class AgentFlowTestCase(unittest.TestCase):
                 "ip": "10.10.3.11",
                 "os": "Windows 11",
                 "activation_applied": True,
+                "capabilities": {"platform": "windows", "actions": ["block_ip", "collect_triage"]},
             },
         )
         self.assertEqual(checkin_active.status_code, 200)
         self.assertEqual(checkin_active.json()["instance"]["status"], "active")
+
+        queued_action = self.client.post(
+            f"/api/agent/instances/{instance_a}/actions",
+            headers=self._admin_headers(),
+            json={
+                "action_type": "block_ip",
+                "parameters": {"ip": "185.227.134.41"},
+                "reason": "Contain SSH brute force source.",
+            },
+        )
+        self.assertEqual(queued_action.status_code, 200)
+        action_id = queued_action.json()["action"]["id"]
 
         heartbeat = self.client.post(
             "/api/agent/heartbeat",
             json={
                 "instance_id": instance_a,
                 "service_state": "running",
+                "signals": {
+                    "platform": "windows",
+                    "hostname": "lab-client-01",
+                    "source_ip": "10.10.3.11",
+                    "failed_login_indicators": 7,
+                    "privilege_indicators": 2,
+                    "defense_evasion_indicators": 1,
+                    "internal_remote_service_hits": 4,
+                    "suspicious_processes": ["nmap", "7z"],
+                },
             },
         )
         self.assertEqual(heartbeat.status_code, 200)
         self.assertEqual(heartbeat.json()["instance"]["service_state"], "running")
+        self.assertEqual(len(heartbeat.json()["pending_actions"]), 1)
+        self.assertEqual(heartbeat.json()["pending_actions"][0]["id"], action_id)
+
+        action_result = self.client.post(
+            "/api/agent/heartbeat",
+            json={
+                "instance_id": instance_a,
+                "service_state": "running",
+                "action_results": [
+                    {
+                        "action_id": action_id,
+                        "success": True,
+                        "output": "Blocked 185.227.134.41 locally.",
+                        "finished_at": "2026-05-06T10:10:00+00:00",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(action_result.status_code, 200)
 
         reject = self.client.post(
             f"/api/agent/instances/{instance_b}/reject",
@@ -211,6 +253,8 @@ class AgentFlowTestCase(unittest.TestCase):
         self.assertEqual(instances_after.status_code, 200)
         by_id = {item["id"]: item for item in instances_after.json()["instances"]}
         self.assertEqual(by_id[instance_b]["status"], "rejected")
+        self.assertEqual(by_id[instance_a]["last_signals"]["failed_login_indicators"], 7)
+        self.assertEqual(by_id[instance_a]["action_history"][-1]["status"], "completed")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -79,13 +81,22 @@ class AgentCheckinRequest(BaseModel):
     ip: str | None = None
     os: str | None = None
     activation_applied: bool = False
+    capabilities: dict[str, Any] | None = None
 
 
 class AgentHeartbeatRequest(BaseModel):
     instance_id: str
     service_state: str = "running"
     last_error: str | None = None
+    signals: dict[str, Any] | None = None
+    action_results: list[dict[str, Any]] | None = None
 
 
 class AgentInstanceActionRequest(BaseModel):
+    reason: str | None = None
+
+
+class AgentCommandCreateRequest(BaseModel):
+    action_type: str
+    parameters: dict[str, Any] | None = None
     reason: str | None = None

@@ -10,6 +10,7 @@ $bundleDir = Join-Path $OutputDir "NetSentinelAgent-$Version"
 
 New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
 Copy-Item -Force "$root\agent\install-windows.ps1" "$bundleDir\install-windows.ps1"
+Copy-Item -Force "$root\agent\runtime-windows.ps1" "$bundleDir\runtime-windows.ps1"
 Copy-Item -Force "$root\agent\README.md" "$bundleDir\README.md"
 Copy-Item -Force "$root\agent\VERSION" "$bundleDir\VERSION"
 Copy-Item -Force "$PSScriptRoot\NetSentinelAgent.iss" "$bundleDir\NetSentinelAgent.iss"

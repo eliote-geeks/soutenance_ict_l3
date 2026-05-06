@@ -19,7 +19,17 @@ def filebeat_hits(minutes: int = LOOKBACK_MINUTES, size: int = 500) -> list[dict
     payload = {
         "size": size,
         "sort": [{"@timestamp": {"order": "desc"}}],
-        "_source": ["@timestamp", "message", "kubernetes.pod.name", "kubernetes.namespace", "source.ip", "host.name", "stream"],
+        "_source": [
+            "@timestamp",
+            "message",
+            "event.dataset",
+            "kubernetes.pod.name",
+            "kubernetes.namespace",
+            "source.ip",
+            "host.name",
+            "stream",
+            "netsentinel.agent.signals",
+        ],
         "query": {"range": {"@timestamp": {"gte": lookback_gte(minutes)}}},
     }
     result = elastic_request(f"/{FILEBEAT_INDEX}/_search", payload)
@@ -131,7 +141,28 @@ def aggregate_current_features(log_hits: list[dict[str, Any]], packet_hits: list
         source = hit.get("_source", {})
         message = str(source.get("message", ""))
         lower_message = message.lower()
+        dataset = str((source.get("event") or {}).get("dataset") or "")
+        agent_signals = ((((source.get("netsentinel") or {}).get("agent")) or {}).get("signals")) or {}
         ip = safe_source_ip(source)
+        if dataset == "netsentinel.agent" and isinstance(agent_signals, dict):
+            ip = ip or str(agent_signals.get("source_ip") or "")
+            if not ip:
+                continue
+            row = features[ip]
+            row["source_ip"] = ip
+            row["hostname"] = row["hostname"] or str(agent_signals.get("hostname") or safe_host(source) or "")
+            row["event_count"] += 1
+            row["failed_logins"] += int(agent_signals.get("failed_login_indicators") or 0)
+            row["privilege_indicators"] += int(agent_signals.get("privilege_indicators") or 0)
+            row["defense_evasion_indicators"] += int(agent_signals.get("defense_evasion_indicators") or 0)
+            row["phishing_indicators"] += int(agent_signals.get("phishing_indicators") or 0)
+            row["suspicious_archive_hits"] += int(agent_signals.get("suspicious_archive_hits") or 0)
+            row["internal_remote_service_hits"] += int(agent_signals.get("internal_remote_service_hits") or 0)
+            row["exfil_bytes"] += int(agent_signals.get("external_established_connections") or 0) * 500000
+            external_count = int(agent_signals.get("external_destinations") or 0)
+            if external_count:
+                row["external_destinations"].update({f"agent-ext-{idx}" for idx in range(external_count)})
+            continue
         if not ip:
             parts = message.split()
             for idx, token in enumerate(parts):
@@ -274,7 +305,28 @@ def aggregate_historical_windows(log_hits: list[dict[str, Any]], packet_hits: li
         source = hit.get("_source", {})
         message = str(source.get("message", ""))
         lower_message = message.lower()
+        dataset = str((source.get("event") or {}).get("dataset") or "")
+        agent_signals = ((((source.get("netsentinel") or {}).get("agent")) or {}).get("signals")) or {}
         ip = safe_source_ip(source)
+        if dataset == "netsentinel.agent" and isinstance(agent_signals, dict):
+            ip = ip or str(agent_signals.get("source_ip") or "")
+            if not ip:
+                continue
+            key = (ip, bucket_for(source.get("@timestamp")))
+            row = buckets[key]
+            row["hostname"] = row["hostname"] or str(agent_signals.get("hostname") or safe_host(source) or "")
+            row["event_count"] += 1
+            row["failed_logins"] += int(agent_signals.get("failed_login_indicators") or 0)
+            row["privilege_indicators"] += int(agent_signals.get("privilege_indicators") or 0)
+            row["defense_evasion_indicators"] += int(agent_signals.get("defense_evasion_indicators") or 0)
+            row["phishing_indicators"] += int(agent_signals.get("phishing_indicators") or 0)
+            row["suspicious_archive_hits"] += int(agent_signals.get("suspicious_archive_hits") or 0)
+            row["internal_remote_service_hits"] += int(agent_signals.get("internal_remote_service_hits") or 0)
+            row["exfil_bytes"] += int(agent_signals.get("external_established_connections") or 0) * 500000
+            external_count = int(agent_signals.get("external_destinations") or 0)
+            if external_count:
+                row["external_destinations"].update({f"agent-ext-{idx}" for idx in range(external_count)})
+            continue
         if not ip and ("Failed password" in message or "Invalid user" in message):
             parts = message.split()
             for idx, token in enumerate(parts):

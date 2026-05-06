@@ -18,9 +18,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 $AgentName = "NetSentinel Agent"
-$AgentVersion = "1.1.0"
+$AgentVersion = "1.2.0"
 $beatsRoot = "C:\Program Files\NetSentinelAgent"
 $stateFile = Join-Path $beatsRoot "agent.json"
+$signalLogPath = "C:\ProgramData\NetSentinelAgent\signals.ndjson"
+$triageDir = "C:\ProgramData\NetSentinelAgent\triage"
+$runtimeScriptPath = Join-Path $beatsRoot "runtime-windows.ps1"
+$runtimeTaskName = "NetSentinelAgentRuntime"
+$runtimeIntervalSeconds = 300
 $downloadsRoot = Join-Path $env:TEMP "NetSentinelAgent"
 $hostnameValue = $env:COMPUTERNAME
 $ipValue = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike "169.254*" -and $_.IPAddress -ne "127.0.0.1" } | Select-Object -First 1 -ExpandProperty IPAddress)
@@ -68,6 +73,14 @@ filebeat.inputs:
     enabled: true
     paths:
       - C:\Windows\System32\winevt\Logs\*.evtx
+  - type: filestream
+    id: netsentinel-agent-signals
+    enabled: true
+    paths:
+      - C:\ProgramData\NetSentinelAgent\*.ndjson
+    parsers:
+      - ndjson:
+          target: ""
 $commonFields
 $(Get-OutputBlock)
 "@
@@ -117,6 +130,7 @@ function Save-State {
     agent_name = $AgentName
     agent_version = $AgentVersion
     beats_version = $BeatsVersion
+    runtime_heartbeat_interval_seconds = $runtimeIntervalSeconds
   }
   $payload | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $stateFile
 }
@@ -188,6 +202,22 @@ function Install-Beats {
   Install-BeatService -BeatName "metricbeat" -ConfigPath "$beatsRoot\metricbeat.yml"
 }
 
+function Install-AgentRuntime {
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $signalLogPath) | Out-Null
+  if (-not (Test-Path (Join-Path $PSScriptRoot "runtime-windows.ps1"))) {
+    throw "runtime-windows.ps1 is missing beside the installer."
+  }
+  Copy-Item -Force -Path (Join-Path $PSScriptRoot "runtime-windows.ps1") -Destination $runtimeScriptPath
+}
+
+function Register-AgentRuntimeTask {
+  $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$runtimeScriptPath`" -StateFile `"$stateFile`" -SignalLogPath `"$signalLogPath`" -TriageDir `"$triageDir`""
+  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
+  $trigger.Repetition = New-ScheduledTaskRepetitionSettingsSet -Interval (New-TimeSpan -Seconds $runtimeIntervalSeconds) -Duration ([TimeSpan]::MaxValue)
+  Register-ScheduledTask -TaskName $runtimeTaskName -Action $action -Trigger $trigger -Description "NetSentinel local runtime" -Force | Out-Null
+  Start-ScheduledTask -TaskName $runtimeTaskName
+}
+
 function Send-Heartbeat {
   param(
     [string]$InstanceId,
@@ -213,6 +243,7 @@ function Apply-Activation {
   $activation = $Response.activation
   $asset = $activation.asset
   $elastic = $activation.elastic
+  $runtime = $activation.runtime
 
   $script:ElasticUrl = $elastic.url
   $script:ApiKey = $elastic.api_key
@@ -223,11 +254,16 @@ function Apply-Activation {
   $script:Environment = $asset.environment
   $script:ProfileId = $asset.profile_id
   $script:AssetId = $asset.id
+  if ($runtime.heartbeat_interval_seconds) {
+    $script:runtimeIntervalSeconds = [int]$runtime.heartbeat_interval_seconds
+  }
 
   Write-Configs
 
   try {
     Install-Beats
+    Install-AgentRuntime
+    Register-AgentRuntimeTask
   } catch {
     Save-State -InstanceId $InstanceId -Status "approved"
     Send-Heartbeat -InstanceId $InstanceId -ServiceState "error" -LastError $_.Exception.Message
@@ -240,6 +276,11 @@ function Apply-Activation {
     ip = $ipValue
     os = $osValue
     activation_applied = $true
+    capabilities = @{
+      platform = "windows"
+      actions = @("block_ip", "unblock_ip", "terminate_process_by_name", "terminate_process_by_pid", "collect_triage")
+      telemetry = @("failed_login_indicators", "privilege_indicators", "defense_evasion_indicators", "phishing_indicators", "suspicious_archive_hits", "internal_remote_service_hits", "external_destinations", "external_established_connections", "listening_ports")
+    }
   }
   Save-State -InstanceId $InstanceId -Status $final.instance.status
   Send-Heartbeat -InstanceId $InstanceId -ServiceState "running"
@@ -278,6 +319,9 @@ if ($Resume) {
   $ProfileId = $state.profile_id
   if ($state.beats_version) {
     $BeatsVersion = $state.beats_version
+  }
+  if ($state.runtime_heartbeat_interval_seconds) {
+    $runtimeIntervalSeconds = [int]$state.runtime_heartbeat_interval_seconds
   }
   Wait-ForApproval -InstanceId $state.instance_id
   return

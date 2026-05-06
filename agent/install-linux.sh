@@ -16,10 +16,23 @@ RESUME_ONLY="false"
 POLL_INTERVAL_SECONDS=5
 APPROVAL_TIMEOUT_SECONDS=300
 AGENT_NAME="NetSentinel Agent"
-AGENT_VERSION="1.1.0"
+AGENT_VERSION="1.2.0"
 
 STATE_DIR="/etc/netsentinel-agent"
 STATE_FILE="$STATE_DIR/agent.json"
+RUNTIME_INSTALL_DIR="/opt/netsentinel-agent"
+RUNTIME_SCRIPT_PATH="$RUNTIME_INSTALL_DIR/ns_agent_runtime.py"
+RUNTIME_SERVICE_PATH="/etc/systemd/system/netsentinel-agent-runtime.service"
+SIGNAL_LOG_DIR="/var/log/netsentinel-agent"
+SIGNAL_LOG_PATH="$SIGNAL_LOG_DIR/signals.ndjson"
+TRIAGE_DIR="$SIGNAL_LOG_DIR/triage"
+BUNDLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHARE_DIR="/usr/share/netsentinel-agent"
+RUNTIME_SOURCE_PATH="$BUNDLE_DIR/ns_agent_runtime.py"
+if [[ ! -f "$RUNTIME_SOURCE_PATH" ]]; then
+  RUNTIME_SOURCE_PATH="$SHARE_DIR/ns_agent_runtime.py"
+fi
+RUNTIME_HEARTBEAT_INTERVAL_SECONDS=300
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -105,6 +118,14 @@ filebeat.inputs:
       - /var/log/auth.log
       - /var/log/syslog
       - /var/log/fail2ban.log
+  - type: filestream
+    id: netsentinel-agent-signals
+    enabled: true
+    paths:
+      - $SIGNAL_LOG_DIR/*.ndjson
+    parsers:
+      - ndjson:
+          target: ""
 $COMMON_FIELDS
 $(write_output_block)
 EOF
@@ -145,14 +166,44 @@ enable_beats() {
   systemctl enable --now metricbeat
 }
 
+install_runtime_assets() {
+  mkdir -p "$RUNTIME_INSTALL_DIR" "$SIGNAL_LOG_DIR" "$TRIAGE_DIR"
+  if [[ ! -f "$RUNTIME_SOURCE_PATH" ]]; then
+    echo "Runtime source not found: $RUNTIME_SOURCE_PATH" >&2
+    exit 1
+  fi
+  install -m 0755 "$RUNTIME_SOURCE_PATH" "$RUNTIME_SCRIPT_PATH"
+}
+
+install_runtime_service() {
+  cat >"$RUNTIME_SERVICE_PATH" <<EOF
+[Unit]
+Description=NetSentinel Agent Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 $RUNTIME_SCRIPT_PATH --state-file $STATE_FILE --signal-log $SIGNAL_LOG_PATH --triage-dir $TRIAGE_DIR
+Restart=always
+RestartSec=20
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now netsentinel-agent-runtime.service
+}
+
 save_state() {
   local instance_id="$1"
   local status="$2"
-  python3 - "$STATE_FILE" "$instance_id" "$status" "$API_URL" "$ASSET_ID" "$PROFILE_ID" "$HOSTNAME_VALUE" "$IP_VALUE" "$OS_VALUE" <<'PY'
+  python3 - "$STATE_FILE" "$instance_id" "$status" "$API_URL" "$ASSET_ID" "$PROFILE_ID" "$HOSTNAME_VALUE" "$IP_VALUE" "$OS_VALUE" "$RUNTIME_HEARTBEAT_INTERVAL_SECONDS" <<'PY'
 import json
 import sys
 
-path, instance_id, status, api_url, asset_id, profile_id, hostname, ip_value, os_value = sys.argv[1:]
+path, instance_id, status, api_url, asset_id, profile_id, hostname, ip_value, os_value, runtime_interval = sys.argv[1:]
 payload = {
     "instance_id": instance_id,
     "status": status,
@@ -162,6 +213,7 @@ payload = {
     "hostname": hostname,
     "ip": ip_value,
     "os": os_value,
+    "runtime_heartbeat_interval_seconds": int(runtime_interval or 300),
 }
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, indent=2)
@@ -181,7 +233,7 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as handle:
     payload = json.load(handle)
 
-for key in ("instance_id", "status", "api_url", "asset_id", "profile_id", "hostname", "ip", "os"):
+for key in ("instance_id", "status", "api_url", "asset_id", "profile_id", "hostname", "ip", "os", "runtime_heartbeat_interval_seconds"):
     value = payload.get(key, "")
     shell_key = key.upper()
     print(f"{shell_key}={shlex.quote(str(value))}")
@@ -211,6 +263,7 @@ instance = data.get("instance") or {}
 activation = data.get("activation") or {}
 asset = activation.get("asset") or {}
 elastic = activation.get("elastic") or {}
+runtime = activation.get("runtime") or {}
 
 fields = {
     "CHECKIN_STATUS": instance.get("status", ""),
@@ -227,6 +280,7 @@ fields = {
     "ACTIVATION_HOSTNAME": asset.get("hostname", ""),
     "ACTIVATION_IP": asset.get("ip", ""),
     "ACTIVATION_OS": asset.get("os", ""),
+    "RUNTIME_HEARTBEAT_INTERVAL_SECONDS": runtime.get("heartbeat_interval_seconds", 300),
 }
 for key, value in fields.items():
     print(f"{key}={shlex.quote(str(value or ''))}")
@@ -246,6 +300,7 @@ apply_activation() {
   HOSTNAME_VALUE="${ACTIVATION_HOSTNAME:-$HOSTNAME_VALUE}"
   IP_VALUE="${ACTIVATION_IP:-$IP_VALUE}"
   OS_VALUE="${ACTIVATION_OS:-$OS_VALUE}"
+  RUNTIME_HEARTBEAT_INTERVAL_SECONDS="${RUNTIME_HEARTBEAT_INTERVAL_SECONDS:-300}"
 
   if [[ -z "$ELASTIC_URL" ]]; then
     echo "Activation payload missing elastic URL." >&2
@@ -253,16 +308,18 @@ apply_activation() {
   fi
   write_configs
   enable_beats
+  install_runtime_assets
 
   local finalize_payload
   finalize_payload=$(cat <<EOF
-{"instance_id":"$INSTANCE_ID","hostname":"$HOSTNAME_VALUE","ip":"$IP_VALUE","os":"$OS_VALUE","activation_applied":true}
+{"instance_id":"$INSTANCE_ID","hostname":"$HOSTNAME_VALUE","ip":"$IP_VALUE","os":"$OS_VALUE","activation_applied":true,"capabilities":{"platform":"linux","actions":["block_ip","unblock_ip","terminate_process_by_name","terminate_process_by_pid","collect_triage"],"telemetry":["failed_login_indicators","privilege_indicators","defense_evasion_indicators","phishing_indicators","suspicious_archive_hits","internal_remote_service_hits","external_destinations","external_established_connections","listening_ports"]}}
 EOF
 )
   local finalize_response
   finalize_response="$(json_post "$API_URL/api/agent/checkin" "$finalize_payload")"
   parse_checkin_response "$finalize_response"
   save_state "$INSTANCE_ID" "${CHECKIN_STATUS:-active}"
+  install_runtime_service
   json_post "$API_URL/api/agent/heartbeat" "{\"instance_id\":\"$INSTANCE_ID\",\"service_state\":\"running\"}" >/dev/null || true
   echo "$AGENT_NAME $AGENT_VERSION active for asset '$ASSET_ID' on '$HOSTNAME_VALUE'"
 }

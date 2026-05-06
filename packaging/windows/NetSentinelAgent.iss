@@ -16,6 +16,7 @@ WizardStyle=modern
 
 [Files]
 Source: "..\..\agent\install-windows.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\agent\runtime-windows.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\agent\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\agent\VERSION"; DestDir: "{app}"; Flags: ignoreversion
 
