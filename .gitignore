@@ -63,6 +63,9 @@ chainlit.md
 
 # Data and databases
 agenthub/agents/youtube/db
+ai-engine/state/attack_dictionary_enterprise.json
+ai-engine/state/*.json
+var/
 
 # Archive files and large assets
 **/*.zip
