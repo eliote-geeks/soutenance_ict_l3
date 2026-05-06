@@ -1,4 +1,4 @@
-# Procede De Mise En Place De L'Application NetSentinel AI
+# Guide De Soutenance NetSentinel AI
 
 ## Theme De Soutenance
 

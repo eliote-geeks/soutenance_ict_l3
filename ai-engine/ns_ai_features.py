@@ -1,0 +1,227 @@
+import ipaddress
+from collections import defaultdict
+from datetime import timedelta, timezone
+from typing import Any
+
+try:
+    from .ns_ai_clients import elastic_request
+    from .ns_ai_config import FILEBEAT_INDEX, LOOKBACK_MINUTES, PACKETBEAT_INDEX, iso, now_utc, parse_dt
+except ImportError:
+    from ns_ai_clients import elastic_request
+    from ns_ai_config import FILEBEAT_INDEX, LOOKBACK_MINUTES, PACKETBEAT_INDEX, iso, now_utc, parse_dt
+
+
+def lookback_gte(minutes: int) -> str:
+    return iso(now_utc() - timedelta(minutes=minutes))
+
+
+def filebeat_hits(minutes: int = LOOKBACK_MINUTES, size: int = 500) -> list[dict[str, Any]]:
+    payload = {
+        "size": size,
+        "sort": [{"@timestamp": {"order": "desc"}}],
+        "_source": ["@timestamp", "message", "kubernetes.pod.name", "kubernetes.namespace", "source.ip", "host.name", "stream"],
+        "query": {"range": {"@timestamp": {"gte": lookback_gte(minutes)}}},
+    }
+    result = elastic_request(f"/{FILEBEAT_INDEX}/_search", payload)
+    return (((result.get("hits") or {}).get("hits")) or [])
+
+
+def packetbeat_hits(minutes: int = LOOKBACK_MINUTES, size: int = 1000) -> list[dict[str, Any]]:
+    payload = {
+        "size": size,
+        "sort": [{"@timestamp": {"order": "desc"}}],
+        "_source": ["@timestamp", "source.ip", "destination.ip", "destination.port", "network.protocol", "event.dataset", "query", "status", "host.name", "url.path"],
+        "query": {"range": {"@timestamp": {"gte": lookback_gte(minutes)}}},
+    }
+    result = elastic_request(f"/{PACKETBEAT_INDEX}/_search", payload)
+    return (((result.get("hits") or {}).get("hits")) or [])
+
+
+def safe_source_ip(source: dict[str, Any]) -> str | None:
+    return (source.get("source") or {}).get("ip")
+
+
+def safe_dest_ip(source: dict[str, Any]) -> str | None:
+    return (source.get("destination") or {}).get("ip")
+
+
+def safe_host(source: dict[str, Any]) -> str | None:
+    return (source.get("host") or {}).get("name")
+
+
+def is_internal_ip(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback or ip.is_link_local
+
+
+def aggregate_current_features(log_hits: list[dict[str, Any]], packet_hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    features: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {
+            "source_ip": None,
+            "hostname": None,
+            "failed_logins": 0,
+            "dns_errors": 0,
+            "distinct_ports": set(),
+            "distinct_destinations": set(),
+            "event_count": 0,
+            "protocols": set(),
+            "http_paths": set(),
+        }
+    )
+
+    for hit in log_hits:
+        source = hit.get("_source", {})
+        message = str(source.get("message", ""))
+        ip = safe_source_ip(source)
+        if not ip:
+            parts = message.split()
+            for idx, token in enumerate(parts):
+                if token == "from" and idx + 1 < len(parts):
+                    ip = parts[idx + 1]
+                    break
+        if not ip:
+            continue
+        row = features[ip]
+        row["source_ip"] = ip
+        row["hostname"] = row["hostname"] or safe_host(source)
+        row["event_count"] += 1
+        if "Failed password" in message or "Invalid user" in message:
+            row["failed_logins"] += 1
+
+    for hit in packet_hits:
+        source = hit.get("_source", {})
+        ip = safe_source_ip(source)
+        if not ip:
+            continue
+        row = features[ip]
+        row["source_ip"] = ip
+        row["hostname"] = row["hostname"] or safe_host(source)
+        row["event_count"] += 1
+        dst_port = (source.get("destination") or {}).get("port")
+        dst_ip = safe_dest_ip(source)
+        protocol = (source.get("network") or {}).get("protocol")
+        if dst_port:
+            row["distinct_ports"].add(int(dst_port))
+        if dst_ip:
+            row["distinct_destinations"].add(dst_ip)
+        if protocol:
+            row["protocols"].add(protocol)
+        if source.get("status") == "Error" and protocol == "dns":
+            row["dns_errors"] += 1
+        path = (source.get("url") or {}).get("path")
+        if path:
+            row["http_paths"].add(path)
+
+    return [
+        {
+            "source_ip": row["source_ip"],
+            "hostname": row["hostname"],
+            "failed_logins": row["failed_logins"],
+            "dns_errors": row["dns_errors"],
+            "distinct_ports": len(row["distinct_ports"]),
+            "distinct_destinations": len(row["distinct_destinations"]),
+            "event_count": row["event_count"],
+            "protocol_count": len(row["protocols"]),
+            "http_path_count": len(row["http_paths"]),
+            "is_internal": is_internal_ip(row["source_ip"]),
+        }
+        for row in features.values()
+    ]
+
+
+def aggregate_historical_windows(log_hits: list[dict[str, Any]], packet_hits: list[dict[str, Any]], bucket_minutes: int) -> list[dict[str, Any]]:
+    buckets: dict[tuple[str, Any], dict[str, Any]] = defaultdict(
+        lambda: {
+            "failed_logins": 0,
+            "dns_errors": 0,
+            "distinct_ports": set(),
+            "distinct_destinations": set(),
+            "event_count": 0,
+            "protocols": set(),
+            "http_paths": set(),
+            "hostname": None,
+        }
+    )
+
+    def bucket_for(ts: Any):
+        dt = parse_dt(ts).astimezone(timezone.utc)
+        floored_minute = (dt.minute // bucket_minutes) * bucket_minutes
+        return dt.replace(minute=floored_minute, second=0, microsecond=0)
+
+    for hit in log_hits:
+        source = hit.get("_source", {})
+        message = str(source.get("message", ""))
+        ip = safe_source_ip(source)
+        if not ip and ("Failed password" in message or "Invalid user" in message):
+            parts = message.split()
+            for idx, token in enumerate(parts):
+                if token == "from" and idx + 1 < len(parts):
+                    ip = parts[idx + 1]
+                    break
+        if not ip:
+            continue
+        key = (ip, bucket_for(source.get("@timestamp")))
+        row = buckets[key]
+        row["hostname"] = row["hostname"] or safe_host(source)
+        row["event_count"] += 1
+        if "Failed password" in message or "Invalid user" in message:
+            row["failed_logins"] += 1
+
+    for hit in packet_hits:
+        source = hit.get("_source", {})
+        ip = safe_source_ip(source)
+        if not ip:
+            continue
+        key = (ip, bucket_for(source.get("@timestamp")))
+        row = buckets[key]
+        row["hostname"] = row["hostname"] or safe_host(source)
+        row["event_count"] += 1
+        protocol = (source.get("network") or {}).get("protocol")
+        dst_port = (source.get("destination") or {}).get("port")
+        dst_ip = safe_dest_ip(source)
+        if protocol:
+            row["protocols"].add(protocol)
+        if dst_port:
+            row["distinct_ports"].add(int(dst_port))
+        if dst_ip:
+            row["distinct_destinations"].add(dst_ip)
+        if source.get("status") == "Error" and protocol == "dns":
+            row["dns_errors"] += 1
+        path = (source.get("url") or {}).get("path")
+        if path:
+            row["http_paths"].add(path)
+
+    return [
+        {
+            "source_ip": ip,
+            "bucket_start": iso(bucket),
+            "hostname": row["hostname"],
+            "failed_logins": row["failed_logins"],
+            "dns_errors": row["dns_errors"],
+            "distinct_ports": len(row["distinct_ports"]),
+            "distinct_destinations": len(row["distinct_destinations"]),
+            "event_count": row["event_count"],
+            "protocol_count": len(row["protocols"]),
+            "http_path_count": len(row["http_paths"]),
+            "is_internal": is_internal_ip(ip),
+        }
+        for (ip, bucket), row in buckets.items()
+    ]
+
+
+def feature_vector(row: dict[str, Any]) -> list[float]:
+    return [
+        float(row["failed_logins"]),
+        float(row["dns_errors"]),
+        float(row["distinct_ports"]),
+        float(row["distinct_destinations"]),
+        float(row["event_count"]),
+        float(row["protocol_count"]),
+        float(row["http_path_count"]),
+        1.0 if row["is_internal"] else 0.0,
+    ]

@@ -58,7 +58,8 @@ Technos principales :
 - CRACO ;
 - Tailwind ;
 - composants Radix ;
-- Recharts.
+- Recharts ;
+- page admin `Agents` pour l'enrolement, l'approbation, le rejet et la desactivation.
 
 Port local habituel :
 
@@ -113,6 +114,7 @@ Approche :
 
 - heuristiques ;
 - `IsolationForest` ;
+- `RandomForest` ;
 - scoring et publication de findings.
 
 Port local habituel :
@@ -140,6 +142,8 @@ Scripts disponibles :
 
 - [install-linux.sh](/home/paul/Bureau/Projects/netsentinel-ai/agent/install-linux.sh)
 - [install-windows.ps1](/home/paul/Bureau/Projects/netsentinel-ai/agent/install-windows.ps1)
+- [build-deb.sh](/home/paul/Bureau/Projects/netsentinel-ai/packaging/linux/build-deb.sh)
+- [build-installer.ps1](/home/paul/Bureau/Projects/netsentinel-ai/packaging/windows/build-installer.ps1)
 
 ## Fonctionnement global
 
@@ -305,6 +309,8 @@ Backend :
 Agent / admin :
 
 - secret admin pour les endpoints d'enrolement
+- `AGENT_ELASTIC_API_KEY`
+- `ALLOW_AGENT_BASIC_AUTH`
 
 ## Deploiement
 
@@ -320,7 +326,7 @@ Le principe de deploiement le plus simple est :
 
 Pour un guide detaille, voir :
 
-- [DEPLOIEMENT_ET_GUIDE_COMPLET_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/DEPLOIEMENT_ET_GUIDE_COMPLET_NETSENTINEL.md)
+- [GUIDE_DEPLOIEMENT_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/GUIDE_DEPLOIEMENT_NETSENTINEL.md)
 
 ## Flux agent
 
@@ -333,7 +339,8 @@ Principes :
 - l'agent peut etre distribue ;
 - il ne collecte rien tant qu'il n'est pas approuve ;
 - l'activation est controlee cote serveur ;
-- l'etat agent est visible dans l'application.
+- l'etat agent est visible dans l'application ;
+- l'admin peut approuver, rejeter ou desactiver un agent depuis le dashboard.
 
 Documentation :
 
@@ -367,6 +374,8 @@ Et il est aussi pousse sur GitHub :
 Le dossier `docs/` est reserve a la documentation NetSentinel.  
 Les anciens documents sans lien direct avec le projet ont ete retires.
 
-- [EXPLICATION_PROJET_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/EXPLICATION_PROJET_NETSENTINEL.md)
-- [PROCEDE_MISE_EN_PLACE_NETSENTINEL_SOUTENANCE.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/PROCEDE_MISE_EN_PLACE_NETSENTINEL_SOUTENANCE.md)
-- [RAPPORT_ETAT_AVANCEMENT_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/RAPPORT_ETAT_AVANCEMENT_NETSENTINEL.md)
+- [GUIDE_DEPLOIEMENT_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/GUIDE_DEPLOIEMENT_NETSENTINEL.md)
+- [PRESENTATION_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/PRESENTATION_NETSENTINEL.md)
+- [GUIDE_SOUTENANCE_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/GUIDE_SOUTENANCE_NETSENTINEL.md)
+- [DEMO_AGENT_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/DEMO_AGENT_NETSENTINEL.md)
+- [RAPPORT_AVANCEMENT_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/RAPPORT_AVANCEMENT_NETSENTINEL.md)

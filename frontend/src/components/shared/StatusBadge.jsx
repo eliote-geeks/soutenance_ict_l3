@@ -46,6 +46,30 @@ const statusConfig = {
     className: 'bg-muted text-muted-foreground border-border',
     label: 'Offline',
   },
+  inactive: {
+    className: 'bg-muted text-muted-foreground border-border',
+    label: 'Inactive',
+  },
+  pending_approval: {
+    className: 'bg-warning/10 text-warning-foreground border-warning/20',
+    label: 'Pending approval',
+  },
+  approved: {
+    className: 'bg-primary/10 text-primary border-primary/20',
+    label: 'Approved',
+  },
+  claimed: {
+    className: 'bg-primary/10 text-primary border-primary/20',
+    label: 'Claimed',
+  },
+  rejected: {
+    className: 'bg-destructive/10 text-destructive border-destructive/20',
+    label: 'Rejected',
+  },
+  disabled: {
+    className: 'bg-muted text-muted-foreground border-border',
+    label: 'Disabled',
+  },
 };
 
 export const StatusBadge = ({ status, className }) => {

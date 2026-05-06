@@ -13,6 +13,7 @@ import LogsExplorerPage from '@/pages/LogsExplorerPage';
 import AlertsPage from '@/pages/AlertsPage';
 import IncidentsPage from '@/pages/IncidentsPage';
 import HostsPage from '@/pages/HostsPage';
+import AgentsPage from '@/pages/AgentsPage';
 import NetworkMapPage from '@/pages/NetworkMapPage';
 import ModelPage from '@/pages/ModelPage';
 import PredictionsPage from '@/pages/PredictionsPage';
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/alerts" element={<AlertsPage />} />
                 <Route path="/incidents" element={<IncidentsPage />} />
                 <Route path="/hosts" element={<HostsPage />} />
+                <Route path="/agents" element={<AgentsPage />} />
                 <Route path="/network" element={<NetworkMapPage />} />
                 <Route path="/model" element={<ModelPage />} />
                 <Route path="/predictions" element={<PredictionsPage />} />

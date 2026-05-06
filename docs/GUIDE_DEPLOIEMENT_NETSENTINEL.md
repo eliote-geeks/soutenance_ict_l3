@@ -1,4 +1,4 @@
-# Deploiement Et Guide Complet NetSentinel AI
+# Guide De Deploiement NetSentinel AI
 
 ## 1. Resume simple du projet
 

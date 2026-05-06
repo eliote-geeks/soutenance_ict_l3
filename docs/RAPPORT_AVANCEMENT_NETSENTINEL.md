@@ -14,7 +14,7 @@ Department of Computer Science
 P.O. Box 812 Yaounde  
 
 
-# TITRE : ETAT D'AVANCEMENT DES TRAVAUX
+# TITRE : RAPPORT D'AVANCEMENT DES TRAVAUX
 
 ## THEME
 

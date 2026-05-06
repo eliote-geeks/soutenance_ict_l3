@@ -15,6 +15,8 @@ ASSET_ID=""
 RESUME_ONLY="false"
 POLL_INTERVAL_SECONDS=5
 APPROVAL_TIMEOUT_SECONDS=300
+AGENT_NAME="NetSentinel Agent"
+AGENT_VERSION="1.1.0"
 
 STATE_DIR="/etc/netsentinel-agent"
 STATE_FILE="$STATE_DIR/agent.json"
@@ -262,7 +264,7 @@ EOF
   parse_checkin_response "$finalize_response"
   save_state "$INSTANCE_ID" "${CHECKIN_STATUS:-active}"
   json_post "$API_URL/api/agent/heartbeat" "{\"instance_id\":\"$INSTANCE_ID\",\"service_state\":\"running\"}" >/dev/null || true
-  echo "NetSentinel agent active for asset '$ASSET_ID' on '$HOSTNAME_VALUE'"
+  echo "$AGENT_NAME $AGENT_VERSION active for asset '$ASSET_ID' on '$HOSTNAME_VALUE'"
 }
 
 wait_for_approval() {
@@ -282,7 +284,7 @@ EOF
     fi
     sleep "$POLL_INTERVAL_SECONDS"
   done
-  echo "Enrollment pending approval. Re-run this script with --resume after admin approval." >&2
+  echo "$AGENT_NAME is pending approval. Re-run this script with --resume after admin approval." >&2
 }
 
 resume_enrollment() {
@@ -301,7 +303,7 @@ enroll_agent() {
   fi
   local payload response
   payload=$(cat <<EOF
-{"token":"$ENROLLMENT_TOKEN","hostname":"$HOSTNAME_VALUE","ip":"$IP_VALUE","os":"$OS_VALUE","agent_version":"1.0.0"}
+{"token":"$ENROLLMENT_TOKEN","hostname":"$HOSTNAME_VALUE","ip":"$IP_VALUE","os":"$OS_VALUE","agent_version":"$AGENT_VERSION"}
 EOF
 )
   response="$(json_post "$API_URL/api/agent/enroll" "$payload")"
@@ -322,7 +324,7 @@ direct_install() {
   fi
   write_configs
   enable_beats
-  echo "NetSentinel agent installed directly for asset '$ASSET_ID' on '$HOSTNAME_VALUE'"
+  echo "$AGENT_NAME $AGENT_VERSION installed directly for asset '$ASSET_ID' on '$HOSTNAME_VALUE'"
 }
 
 install_beats

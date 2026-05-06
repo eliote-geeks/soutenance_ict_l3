@@ -18,9 +18,10 @@ import {
   generateLogs,
 } from './mockData';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8010';
 const API_BASE = `${BACKEND_URL}/api`;
 const SCOPE_STORAGE_KEY = 'netsentinel-scope';
+const ADMIN_SECRET = process.env.REACT_APP_ADMIN_SECRET || 'netsentinel-admin-dev-secret';
 
 // Simulate network delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -55,6 +56,28 @@ const fetchJson = async (path, options) => {
   const response = await fetch(`${API_BASE}${scopedPath}`, options);
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`);
+  }
+  return response.json();
+};
+
+const fetchAdminJson = async (path, options = {}) => {
+  const headers = {
+    ...(options.headers || {}),
+    'x-admin-secret': ADMIN_SECRET,
+  };
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+  });
+  if (!response.ok) {
+    let detail = `API request failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      detail = payload.detail || payload.message || detail;
+    } catch (error) {
+      // keep default detail
+    }
+    throw new Error(detail);
   }
   return response.json();
 };
@@ -175,6 +198,93 @@ export const fetchScopeOptions = async () => {
   }
   return response.json();
 };
+
+export const fetchAssets = async () => {
+  if (USE_MOCK) {
+    await delay(250);
+    return {
+      assets: generateHosts(20).map((host) => ({
+        id: host.id,
+        hostname: host.hostname,
+        ip: host.ip,
+        os: host.os,
+        role: host.role,
+        site: 'lab',
+        environment: 'lab',
+        agentStatus: host.agent === 'missing' ? 'inactive' : 'active',
+        agentLastSeenAt: new Date().toISOString(),
+        agentInstanceId: host.agent === 'missing' ? null : `agent_${host.id}`,
+      })),
+    };
+  }
+  return fetchJson('/assets');
+};
+
+export const fetchAgentInstances = async () => {
+  if (USE_MOCK) {
+    await delay(250);
+    return {
+      instances: [
+        {
+          id: 'agent_demo_01',
+          asset_id: 'asset_lab_01',
+          hostname: 'lab-client-01',
+          ip: '10.10.3.10',
+          os: 'Windows 11',
+          agent_version: '1.1.0',
+          status: 'pending_approval',
+          created_at: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
+          service_state: 'installing',
+          asset: {
+            id: 'asset_lab_01',
+            hostname: 'lab-client-01',
+            ip: '10.10.3.10',
+            os: 'Windows 11',
+            role: 'Workstation',
+            site: 'lab',
+            environment: 'lab',
+          },
+        },
+      ],
+    };
+  }
+  return fetchAdminJson('/agent/instances');
+};
+
+export const fetchEnrollmentTokens = async () => {
+  if (USE_MOCK) {
+    await delay(200);
+    return { tokens: [] };
+  }
+  return fetchAdminJson('/agent/enrollment-tokens');
+};
+
+export const createEnrollmentToken = async (payload) => fetchAdminJson('/agent/enrollment-tokens', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
+});
+
+export const revokeEnrollmentToken = async (tokenId) => fetchAdminJson(`/agent/enrollment-tokens/${tokenId}/revoke`, {
+  method: 'POST',
+});
+
+export const approveAgentInstance = async (instanceId) => fetchAdminJson(`/agent/instances/${instanceId}/approve`, {
+  method: 'POST',
+});
+
+export const rejectAgentInstance = async (instanceId, reason = '') => fetchAdminJson(`/agent/instances/${instanceId}/reject`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ reason }),
+});
+
+export const disableAgentInstance = async (instanceId, reason = '') => fetchAdminJson(`/agent/instances/${instanceId}/disable`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ reason }),
+});
 
 // Action functions
 export const acknowledgeAlert = async (alertId) => {

@@ -4,6 +4,10 @@ Agent installable pour rattacher une machine a NetSentinel avec un flux controle
 
 `install -> enroll -> approve -> active`
 
+Version courante :
+
+- `1.1.0`
+
 Le principe:
 - l'agent peut etre distribue publiquement
 - il ne collecte rien tant qu'il n'est pas approuve
@@ -106,10 +110,12 @@ sudo bash install-linux.sh \
 
 ## Windows
 
-Le script Windows supporte aussi `enroll` et `resume`, mais reste pour l'instant un bootstrap Beats:
-- il ecrit les configs apres approbation
-- il stocke son etat dans `C:\Program Files\NetSentinelAgent\agent.json`
-- il faut encore copier les binaires Beats et installer les services Windows Elastic
+Le script Windows est maintenant one-click :
+- il telecharge automatiquement les paquets Beats Elastic ;
+- il ecrit les configs apres approbation ;
+- il installe les services Windows `Filebeat`, `Packetbeat`, `Metricbeat` ;
+- il stocke son etat dans `C:\Program Files\NetSentinelAgent\agent.json` ;
+- il remonte un heartbeat avec etat `running` ou `error`.
 
 Mode direct:
 
@@ -133,6 +139,8 @@ Admin:
 - `POST /api/agent/enrollment-tokens/{token_id}/revoke`
 - `GET /api/agent/instances`
 - `POST /api/agent/instances/{instance_id}/approve`
+- `POST /api/agent/instances/{instance_id}/reject`
+- `POST /api/agent/instances/{instance_id}/disable`
 
 Agent:
 - `POST /api/agent/enroll`
@@ -151,3 +159,24 @@ Ce qui permet a l'interface NetSentinel d'afficher si une machine est:
 - `pending_approval`
 - `approved`
 - `active`
+- `rejected`
+
+## Packaging
+
+Scripts disponibles :
+
+- Linux `.deb` :
+  - [build-deb.sh](/home/paul/Bureau/Projects/netsentinel-ai/packaging/linux/build-deb.sh)
+- Windows bundle / installateur :
+  - [build-installer.ps1](/home/paul/Bureau/Projects/netsentinel-ai/packaging/windows/build-installer.ps1)
+  - [NetSentinelAgent.iss](/home/paul/Bureau/Projects/netsentinel-ai/packaging/windows/NetSentinelAgent.iss)
+
+## Securite
+
+L'agent doit recevoir une credential dediee.
+
+Recommandation :
+
+- definir `AGENT_ELASTIC_API_KEY` cote backend ;
+- ne pas reutiliser un mot de passe Elastic global ;
+- n'autoriser le fallback username/password que si `ALLOW_AGENT_BASIC_AUTH=true` est explicitement active.

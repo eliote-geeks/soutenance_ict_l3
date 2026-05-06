@@ -15,6 +15,7 @@ import {
   Users,
   User,
   Settings,
+  Bot,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -29,6 +30,7 @@ const navItems = [
   { path: '/alerts', icon: Bell, label: 'Alerts', priority: true, badge: true },
   { path: '/incidents', icon: AlertTriangle, label: 'Incidents' },
   { path: '/hosts', icon: Server, label: 'Assets/Hosts' },
+  { path: '/agents', icon: Bot, label: 'Agents', adminOnly: true },
   { path: '/network', icon: Network, label: 'Network Flows' },
   { path: '/model', icon: Brain, label: 'AI Detection' },
   { path: '/predictions', icon: TrendingUp, label: 'Risk Forecast', priority: true },
@@ -47,6 +49,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useAuth();
   const isCollapsed = typeof collapsed === 'boolean' ? collapsed : localCollapsed;
   const isAdmin = user?.role === 'admin';
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
   const visibleAccountItems = accountItems.filter((item) => !item.adminOnly || isAdmin);
 
   const handleToggle = () => {
@@ -85,7 +88,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
               Core
             </p>
           )}
-          {navItems.map((item, index) => (
+          {visibleNavItems.map((item, index) => (
             <NavLink
               key={item.path}
               to={item.path}
