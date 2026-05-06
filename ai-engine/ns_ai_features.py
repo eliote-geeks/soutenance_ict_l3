@@ -30,7 +30,21 @@ def packetbeat_hits(minutes: int = LOOKBACK_MINUTES, size: int = 1000) -> list[d
     payload = {
         "size": size,
         "sort": [{"@timestamp": {"order": "desc"}}],
-        "_source": ["@timestamp", "source.ip", "destination.ip", "destination.port", "network.protocol", "event.dataset", "query", "status", "host.name", "url.path"],
+        "_source": [
+            "@timestamp",
+            "source.ip",
+            "source.bytes",
+            "destination.ip",
+            "destination.port",
+            "destination.bytes",
+            "network.protocol",
+            "network.bytes",
+            "event.dataset",
+            "query",
+            "status",
+            "host.name",
+            "url.path",
+        ],
         "query": {"range": {"@timestamp": {"gte": lookback_gte(minutes)}}},
     }
     result = elastic_request(f"/{PACKETBEAT_INDEX}/_search", payload)
@@ -66,17 +80,57 @@ def aggregate_current_features(log_hits: list[dict[str, Any]], packet_hits: list
             "hostname": None,
             "failed_logins": 0,
             "dns_errors": 0,
+            "privilege_indicators": 0,
+            "defense_evasion_indicators": 0,
+            "phishing_indicators": 0,
             "distinct_ports": set(),
             "distinct_destinations": set(),
+            "external_destinations": set(),
+            "internal_remote_service_hits": 0,
+            "exfil_bytes": 0,
+            "suspicious_archive_hits": 0,
             "event_count": 0,
             "protocols": set(),
             "http_paths": set(),
         }
     )
 
+    privilege_keywords = (
+        "sudo",
+        "privilege escalation",
+        "added to sudoers",
+        "new service creation",
+        "setuid",
+        "runas",
+    )
+    evasion_keywords = (
+        "shadow copies",
+        "vssadmin",
+        "clear logs",
+        "wevtutil cl",
+        "disable defender",
+        "tamper",
+        "history -c",
+        "setenforce 0",
+        "stop security service",
+    )
+    phishing_keywords = (
+        "phish",
+        "credential harvest",
+        "suspicious attachment",
+        "macro",
+        "dmarc",
+        "spf",
+        "spoof",
+        "mail delivery",
+    )
+    archive_keywords = (".zip", ".rar", ".7z", "archive upload", "exfil")
+    remote_admin_ports = {22, 135, 139, 445, 3389, 5985, 5986}
+
     for hit in log_hits:
         source = hit.get("_source", {})
         message = str(source.get("message", ""))
+        lower_message = message.lower()
         ip = safe_source_ip(source)
         if not ip:
             parts = message.split()
@@ -92,6 +146,14 @@ def aggregate_current_features(log_hits: list[dict[str, Any]], packet_hits: list
         row["event_count"] += 1
         if "Failed password" in message or "Invalid user" in message:
             row["failed_logins"] += 1
+        if any(keyword in lower_message for keyword in privilege_keywords):
+            row["privilege_indicators"] += 1
+        if any(keyword in lower_message for keyword in evasion_keywords):
+            row["defense_evasion_indicators"] += 1
+        if any(keyword in lower_message for keyword in phishing_keywords):
+            row["phishing_indicators"] += 1
+        if any(keyword in lower_message for keyword in archive_keywords):
+            row["suspicious_archive_hits"] += 1
 
     for hit in packet_hits:
         source = hit.get("_source", {})
@@ -105,10 +167,13 @@ def aggregate_current_features(log_hits: list[dict[str, Any]], packet_hits: list
         dst_port = (source.get("destination") or {}).get("port")
         dst_ip = safe_dest_ip(source)
         protocol = (source.get("network") or {}).get("protocol")
+        network_bytes = int(((source.get("network") or {}).get("bytes")) or 0)
         if dst_port:
             row["distinct_ports"].add(int(dst_port))
         if dst_ip:
             row["distinct_destinations"].add(dst_ip)
+            if not is_internal_ip(dst_ip):
+                row["external_destinations"].add(dst_ip)
         if protocol:
             row["protocols"].add(protocol)
         if source.get("status") == "Error" and protocol == "dns":
@@ -116,6 +181,12 @@ def aggregate_current_features(log_hits: list[dict[str, Any]], packet_hits: list
         path = (source.get("url") or {}).get("path")
         if path:
             row["http_paths"].add(path)
+            if any(keyword in path.lower() for keyword in archive_keywords):
+                row["suspicious_archive_hits"] += 1
+        if is_internal_ip(row["source_ip"]) and dst_ip and is_internal_ip(dst_ip) and dst_port in remote_admin_ports:
+            row["internal_remote_service_hits"] += 1
+        if dst_ip and not is_internal_ip(dst_ip):
+            row["exfil_bytes"] += network_bytes
 
     return [
         {
@@ -123,8 +194,15 @@ def aggregate_current_features(log_hits: list[dict[str, Any]], packet_hits: list
             "hostname": row["hostname"],
             "failed_logins": row["failed_logins"],
             "dns_errors": row["dns_errors"],
+            "privilege_indicators": row["privilege_indicators"],
+            "defense_evasion_indicators": row["defense_evasion_indicators"],
+            "phishing_indicators": row["phishing_indicators"],
             "distinct_ports": len(row["distinct_ports"]),
             "distinct_destinations": len(row["distinct_destinations"]),
+            "external_destinations": len(row["external_destinations"]),
+            "internal_remote_service_hits": row["internal_remote_service_hits"],
+            "exfil_bytes": row["exfil_bytes"],
+            "suspicious_archive_hits": row["suspicious_archive_hits"],
             "event_count": row["event_count"],
             "protocol_count": len(row["protocols"]),
             "http_path_count": len(row["http_paths"]),
@@ -139,14 +217,53 @@ def aggregate_historical_windows(log_hits: list[dict[str, Any]], packet_hits: li
         lambda: {
             "failed_logins": 0,
             "dns_errors": 0,
+            "privilege_indicators": 0,
+            "defense_evasion_indicators": 0,
+            "phishing_indicators": 0,
             "distinct_ports": set(),
             "distinct_destinations": set(),
+            "external_destinations": set(),
+            "internal_remote_service_hits": 0,
+            "exfil_bytes": 0,
+            "suspicious_archive_hits": 0,
             "event_count": 0,
             "protocols": set(),
             "http_paths": set(),
             "hostname": None,
         }
     )
+
+    privilege_keywords = (
+        "sudo",
+        "privilege escalation",
+        "added to sudoers",
+        "new service creation",
+        "setuid",
+        "runas",
+    )
+    evasion_keywords = (
+        "shadow copies",
+        "vssadmin",
+        "clear logs",
+        "wevtutil cl",
+        "disable defender",
+        "tamper",
+        "history -c",
+        "setenforce 0",
+        "stop security service",
+    )
+    phishing_keywords = (
+        "phish",
+        "credential harvest",
+        "suspicious attachment",
+        "macro",
+        "dmarc",
+        "spf",
+        "spoof",
+        "mail delivery",
+    )
+    archive_keywords = (".zip", ".rar", ".7z", "archive upload", "exfil")
+    remote_admin_ports = {22, 135, 139, 445, 3389, 5985, 5986}
 
     def bucket_for(ts: Any):
         dt = parse_dt(ts).astimezone(timezone.utc)
@@ -156,6 +273,7 @@ def aggregate_historical_windows(log_hits: list[dict[str, Any]], packet_hits: li
     for hit in log_hits:
         source = hit.get("_source", {})
         message = str(source.get("message", ""))
+        lower_message = message.lower()
         ip = safe_source_ip(source)
         if not ip and ("Failed password" in message or "Invalid user" in message):
             parts = message.split()
@@ -171,6 +289,14 @@ def aggregate_historical_windows(log_hits: list[dict[str, Any]], packet_hits: li
         row["event_count"] += 1
         if "Failed password" in message or "Invalid user" in message:
             row["failed_logins"] += 1
+        if any(keyword in lower_message for keyword in privilege_keywords):
+            row["privilege_indicators"] += 1
+        if any(keyword in lower_message for keyword in evasion_keywords):
+            row["defense_evasion_indicators"] += 1
+        if any(keyword in lower_message for keyword in phishing_keywords):
+            row["phishing_indicators"] += 1
+        if any(keyword in lower_message for keyword in archive_keywords):
+            row["suspicious_archive_hits"] += 1
 
     for hit in packet_hits:
         source = hit.get("_source", {})
@@ -184,17 +310,26 @@ def aggregate_historical_windows(log_hits: list[dict[str, Any]], packet_hits: li
         protocol = (source.get("network") or {}).get("protocol")
         dst_port = (source.get("destination") or {}).get("port")
         dst_ip = safe_dest_ip(source)
+        network_bytes = int(((source.get("network") or {}).get("bytes")) or 0)
         if protocol:
             row["protocols"].add(protocol)
         if dst_port:
             row["distinct_ports"].add(int(dst_port))
         if dst_ip:
             row["distinct_destinations"].add(dst_ip)
+            if not is_internal_ip(dst_ip):
+                row["external_destinations"].add(dst_ip)
         if source.get("status") == "Error" and protocol == "dns":
             row["dns_errors"] += 1
         path = (source.get("url") or {}).get("path")
         if path:
             row["http_paths"].add(path)
+            if any(keyword in path.lower() for keyword in archive_keywords):
+                row["suspicious_archive_hits"] += 1
+        if is_internal_ip(ip) and dst_ip and is_internal_ip(dst_ip) and dst_port in remote_admin_ports:
+            row["internal_remote_service_hits"] += 1
+        if dst_ip and not is_internal_ip(dst_ip):
+            row["exfil_bytes"] += network_bytes
 
     return [
         {
@@ -203,8 +338,15 @@ def aggregate_historical_windows(log_hits: list[dict[str, Any]], packet_hits: li
             "hostname": row["hostname"],
             "failed_logins": row["failed_logins"],
             "dns_errors": row["dns_errors"],
+            "privilege_indicators": row["privilege_indicators"],
+            "defense_evasion_indicators": row["defense_evasion_indicators"],
+            "phishing_indicators": row["phishing_indicators"],
             "distinct_ports": len(row["distinct_ports"]),
             "distinct_destinations": len(row["distinct_destinations"]),
+            "external_destinations": len(row["external_destinations"]),
+            "internal_remote_service_hits": row["internal_remote_service_hits"],
+            "exfil_bytes": row["exfil_bytes"],
+            "suspicious_archive_hits": row["suspicious_archive_hits"],
             "event_count": row["event_count"],
             "protocol_count": len(row["protocols"]),
             "http_path_count": len(row["http_paths"]),
@@ -218,8 +360,15 @@ def feature_vector(row: dict[str, Any]) -> list[float]:
     return [
         float(row["failed_logins"]),
         float(row["dns_errors"]),
+        float(row["privilege_indicators"]),
+        float(row["defense_evasion_indicators"]),
+        float(row["phishing_indicators"]),
         float(row["distinct_ports"]),
         float(row["distinct_destinations"]),
+        float(row["external_destinations"]),
+        float(row["internal_remote_service_hits"]),
+        float(row["exfil_bytes"]),
+        float(row["suspicious_archive_hits"]),
         float(row["event_count"]),
         float(row["protocol_count"]),
         float(row["http_path_count"]),

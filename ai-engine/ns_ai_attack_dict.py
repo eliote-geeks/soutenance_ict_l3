@@ -30,6 +30,14 @@ SEED_TECHNIQUES = {
     "T1110": {"id": "T1110", "name": "Brute Force"},
     "T1071.004": {"id": "T1071.004", "name": "DNS"},
     "T1046": {"id": "T1046", "name": "Network Service Discovery"},
+    "T1566": {"id": "T1566", "name": "Phishing"},
+    "T1548": {"id": "T1548", "name": "Abuse Elevation Control Mechanism"},
+    "T1068": {"id": "T1068", "name": "Exploitation for Privilege Escalation"},
+    "T1070": {"id": "T1070", "name": "Indicator Removal on Host"},
+    "T1562": {"id": "T1562", "name": "Impair Defenses"},
+    "T1021": {"id": "T1021", "name": "Remote Services"},
+    "T1041": {"id": "T1041", "name": "Exfiltration Over C2 Channel"},
+    "T1048": {"id": "T1048", "name": "Exfiltration Over Alternative Protocol"},
 }
 
 
