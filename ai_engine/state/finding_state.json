@@ -1,0 +1,166 @@
+{
+  "published": {
+    "7a9cf100871507534cb395f20cc06646b4b18dac1304306ea04c240c11aef823": {
+      "last_published_at": "2026-05-16T00:15:01.881498+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "192.168.1.118",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "fddbbf90e066ecf1a7259921d9343ab2fdd7797abd7dcf400936885d8fefc5d2": {
+      "last_published_at": "2026-05-16T00:09:03.143178+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "127.0.0.1",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "93debb0b2f052df7e3fceb6462f6ffe374bb173f682b71f31cb81b512483ed79": {
+      "last_published_at": "2026-05-09T23:03:02.626892+00:00",
+      "title": "Privilege escalation pattern detected",
+      "source_ip": null,
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "d0d9550361e8f708b7c36d00a92d779fbcbc5415f88e92a40a903b75ecad68ab": {
+      "last_published_at": "2026-05-16T00:10:02.383217+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "192.168.1.118",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "791612300a4d30a3ff67714672b690fdc71e9b21d07bb8d592c54103affcf992": {
+      "last_published_at": "2026-05-16T00:10:02.438580+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "192.168.1.118",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "e89674647aee336d881672aa92e7558cff46df34698536083c4e14e8220b6337": {
+      "last_published_at": "2026-05-16T00:27:01.736315+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "192.168.1.118",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "af10d948be4ff3fc1f1404cc24f66d78c7b9ce8695fbbe8b36bab3fb95a9cdf0": {
+      "last_published_at": "2026-05-15T14:55:02.740938+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "127.0.0.1",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "5dacc43bbe171dabc66195833f01721c2525462f2ed95a65dbd755009fe70473": {
+      "last_published_at": "2026-05-16T00:27:01.775946+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "127.0.0.1",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "29b0019e137197af1ea2493788d13e875fb64af81cc382403505f38566922e1c": {
+      "last_published_at": "2026-05-15T14:52:02.658204+00:00",
+      "title": "Port scan behavior suspected",
+      "source_ip": "127.0.0.53",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "7bfbd387055cc85a51dd2cafd6c2694777945728eba74db242d78310dbd73fdc": {
+      "last_published_at": "2026-05-15T14:52:02.693395+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "127.0.0.53",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "ff250ca5e1fc657516c5a97143c62368185c5748a37225e549580ecb39c6314b": {
+      "last_published_at": "2026-05-09T20:02:02.284990+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "192.168.1.141",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "b9288e4381492343723f264724546f8f9bed7b5037d04f58cb3987291f469eba": {
+      "last_published_at": "2026-05-11T08:59:01.772373+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "192.168.1.141",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "a68c9dc22c296b4b47add78723057c2efdc76c7daeb92cda61af1091c3eecb53": {
+      "last_published_at": "2026-05-09T21:03:01.828774+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "192.168.1.141",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "b5d4078dc222e6cdf55241ea3612ae5a0ee54121f87fe546d85963b43536e58a": {
+      "last_published_at": "2026-05-11T08:59:01.829670+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "192.168.1.141",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "57d70bafe74dc03def2dced31472d4ab61181eea49701f91d4cd9b9a92ee6168": {
+      "last_published_at": "2026-05-15T13:18:04.180215+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "192.168.177.158",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "c75eb10f9f829c2e2bc0864693d3b82acece445c62c59ab285b174dcb7779f87": {
+      "last_published_at": "2026-05-15T13:22:02.826271+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "192.168.177.158",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "8417984ac00452933282e3a21617e031e3f8f7f676ef2b68e14d94eac9493ae6": {
+      "last_published_at": "2026-05-15T13:18:04.373005+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "192.168.177.158",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "62b7b833ed2681d63ce52f953223849189838dda66357fac6883e8ba6b0a5f5c": {
+      "last_published_at": "2026-05-15T13:25:02.622640+00:00",
+      "title": "DNS anomaly burst detected",
+      "source_ip": "192.168.177.158",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "3cd2aedf3ee76ec60df93a799e223b50f4cc378e0a6819c88df568f9b1aff4f4": {
+      "last_published_at": "2026-05-16T00:10:02.280980+00:00",
+      "title": "Port scan behavior suspected",
+      "source_ip": "127.0.0.1",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "6711604a8a3f1da791d9852d358c530e891e7816a06dc30414e9ecba77b5cde8": {
+      "last_published_at": "2026-05-15T14:04:02.105148+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "fe80::2c8d:f7dc:2787:e6c",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "565c2304dc9db86cb8dd73b6e7d10d3a255556a1bd7e50b6a97d45b738a41aad": {
+      "last_published_at": "2026-05-15T14:39:02.266454+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "fe80::f4e0:16af:1318:34f5",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "f5a6b2c92f33e1ca1fdd207685a66b099627e26d1db8f4988c3e2ed322100989": {
+      "last_published_at": "2026-05-15T14:39:02.306766+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "fe80::f4e0:16af:1318:34f5",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "c87516d920a824ca0054d43f15eb3eb3c19b4121581295693c3cd1ccced47aba": {
+      "last_published_at": "2026-05-15T15:20:01.690366+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "fe80::eb11:e106:5a4f:5c57",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "70e72850afa8fce4abae050c47df6650c54de141134b527e38804d2aca164a49": {
+      "last_published_at": "2026-05-15T15:20:01.720859+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "fe80::6c6a:a6ff:fe3b:ad5e",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "6d8ea7121eb9b109237c7e20643cbe6f04cd146f57c1f4b3795773a983d00dc4": {
+      "last_published_at": "2026-05-15T15:20:01.753117+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "fe80::eb11:e106:5a4f:5c57",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "12b567650c4e1fdef67e3efd9b35d7800f34e5b3f30f8e97b166bf9fdb0f074b": {
+      "last_published_at": "2026-05-15T15:23:01.866031+00:00",
+      "title": "Lateral movement suspected",
+      "source_ip": "fe80::3545:a159:40d5:6b31",
+      "hostname": "chelsy-thinkpad-t460s"
+    },
+    "889e0742b3d7cecbf9103fbe209ca6acd7dc39a2c0ada2ab8378ffdb79d366d5": {
+      "last_published_at": "2026-05-16T00:38:02.502452+00:00",
+      "title": "ML network anomaly detected",
+      "source_ip": "104.18.39.21",
+      "hostname": "chelsy-thinkpad-t460s"
+    }
+  }
+}
