@@ -145,6 +145,22 @@ Scripts disponibles :
 - [build-deb.sh](/home/paul/Bureau/Projects/netsentinel-ai/packaging/linux/build-deb.sh)
 - [build-installer.ps1](/home/paul/Bureau/Projects/netsentinel-ai/packaging/windows/build-installer.ps1)
 
+Installation one-shot depuis GitHub :
+
+Ubuntu :
+
+```bash
+TOKEN="NSTMETOKEN"; API_URL="http://79.137.32.27:8010"; TMP_DIR="$(mktemp -d)" && curl -fsSL "https://raw.githubusercontent.com/eliote-geeks/soutenance_ict_l3/main/agent/install-linux.sh" -o "$TMP_DIR/install-linux.sh" && curl -fsSL "https://raw.githubusercontent.com/eliote-geeks/soutenance_ict_l3/main/agent/ns_agent_runtime.py" -o "$TMP_DIR/ns_agent_runtime.py" && sudo bash "$TMP_DIR/install-linux.sh" --api-url "$API_URL" --enrollment-token "$TOKEN"
+```
+
+Windows PowerShell Administrateur :
+
+```powershell
+$Token = "NSTMETOKEN"; $ApiUrl = "http://79.137.32.27:8010"; $Dir = Join-Path $env:TEMP "netsentinel-agent"; New-Item -ItemType Directory -Force -Path $Dir | Out-Null; Invoke-WebRequest "https://raw.githubusercontent.com/eliote-geeks/soutenance_ict_l3/main/agent/install-windows.ps1" -OutFile "$Dir\install-windows.ps1"; Invoke-WebRequest "https://raw.githubusercontent.com/eliote-geeks/soutenance_ict_l3/main/agent/runtime-windows.ps1" -OutFile "$Dir\runtime-windows.ps1"; powershell -ExecutionPolicy Bypass -File "$Dir\install-windows.ps1" -ApiUrl $ApiUrl -EnrollmentToken $Token
+```
+
+Remplacer `NSTMETOKEN` par le token brut cree depuis la page Agents ou l'API.
+
 ## Fonctionnement global
 
 Le flux logique du projet est :
