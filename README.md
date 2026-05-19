@@ -292,11 +292,29 @@ Acces :
 
 Backend et AI engine utilisent notamment :
 
+- `NETSENTINEL_STORAGE_BACKEND` : `elastic`, `json` ou `demo`
+- `STORAGE_JSON_PATH` : chemin du fichier de stockage si `NETSENTINEL_STORAGE_BACKEND=json`
+- `NETSENTINEL_TELEMETRY_BACKEND` : `elastic`, `json` ou `demo`
+- `TELEMETRY_JSON_PATH` : chemin du fichier de telemetrie si `NETSENTINEL_TELEMETRY_BACKEND=json`
 - `ELASTICSEARCH_URL`
 - `ELASTICSEARCH_USERNAME`
 - `ELASTICSEARCH_PASSWORD`
 - `ELASTICSEARCH_API_KEY`
 - `ELASTICSEARCH_VERIFY_TLS`
+
+Le stockage applicatif du backend est maintenant configurable par environnement :
+
+- `elastic` : profils, assets, agents et findings sont stockes dans Elasticsearch ;
+- `json` : profils, assets, agents et findings sont stockes localement dans un fichier JSON ;
+- `demo` : lecture des donnees de demonstration, sans persistance.
+
+La telemetrie securite est aussi configurable par environnement :
+
+- `elastic` : lit les index Beats (`filebeat-*`, `packetbeat-*`, `metricbeat-*`) ;
+- `json` : lit un fichier JSON contenant `logs`, `packet_events`, `metric_hosts`, `ai_alerts`, et optionnellement `traffic` ;
+- `demo` : laisse l'application retomber sur les jeux de donnees de demonstration.
+
+Pour PostgreSQL ou une autre base, l'interface est maintenant isolee dans `backend/ns_telemetry.py`.
 
 AI engine :
 

@@ -99,6 +99,8 @@ Le script Linux:
 - active les services quand l'instance est approuvee
 - lance aussi un runtime local `ns_agent_runtime.py`
 - stocke son etat dans `/etc/netsentinel-agent/agent.json`
+- supporte `--resume`, `--upgrade` et `--uninstall`
+- verrouille les fichiers de configuration et d'etat en lecture root uniquement
 
 Mode direct encore supporte:
 
@@ -117,12 +119,14 @@ sudo bash install-linux.sh \
 ## Windows
 
 Le script Windows est maintenant one-click :
-- il telecharge automatiquement les paquets Beats Elastic ;
+- il telecharge automatiquement `Filebeat`, `Winlogbeat`, `Packetbeat` et `Metricbeat` ;
+- `Winlogbeat` collecte les journaux Windows `Security`, `System` et `Application` ;
 - il ecrit les configs apres approbation ;
-- il installe les services Windows `Filebeat`, `Packetbeat`, `Metricbeat` ;
+- il installe les services Windows `Filebeat`, `Winlogbeat`, `Packetbeat`, `Metricbeat` ;
 - il enregistre une tache planifiee de runtime local ;
 - il stocke son etat dans `C:\Program Files\NetSentinelAgent\agent.json` ;
 - il remonte un heartbeat avec etat `running` ou `error`.
+- il supporte `-Resume`, `-Upgrade` et `-Uninstall`.
 
 Mode direct:
 
@@ -217,3 +221,5 @@ Recommandation :
 - definir `AGENT_ELASTIC_API_KEY` cote backend ;
 - ne pas reutiliser un mot de passe Elastic global ;
 - n'autoriser le fallback username/password que si `ALLOW_AGENT_BASIC_AUTH=true` est explicitement active.
+- cote agent, le fallback username/password est bloque sauf si `NETSENTINEL_ALLOW_BASIC_AUTH=true`.
+- les actions locales refusent les IP loopback/multicast/non specifiees et les processus systeme/proteges.

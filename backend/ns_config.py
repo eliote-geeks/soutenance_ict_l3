@@ -70,11 +70,21 @@ def percent_change(current: int | float, previous: int | float) -> str:
 
 
 START_TIME = now_utc()
+NETSENTINEL_STORAGE_BACKEND = os.environ.get("NETSENTINEL_STORAGE_BACKEND", "").strip().lower()
+NETSENTINEL_TELEMETRY_BACKEND = os.environ.get("NETSENTINEL_TELEMETRY_BACKEND", "").strip().lower()
 ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "").rstrip("/")
 ELASTICSEARCH_USERNAME = os.environ.get("ELASTICSEARCH_USERNAME")
 ELASTICSEARCH_PASSWORD = os.environ.get("ELASTICSEARCH_PASSWORD")
 ELASTICSEARCH_API_KEY = os.environ.get("ELASTICSEARCH_API_KEY")
 ELASTICSEARCH_VERIFY_TLS = os.environ.get("ELASTICSEARCH_VERIFY_TLS", "true").lower() == "true"
+if not NETSENTINEL_STORAGE_BACKEND:
+    NETSENTINEL_STORAGE_BACKEND = "elastic" if ELASTICSEARCH_URL else "demo"
+if not NETSENTINEL_TELEMETRY_BACKEND:
+    NETSENTINEL_TELEMETRY_BACKEND = "elastic" if ELASTICSEARCH_URL else "demo"
+_storage_json_path = Path(os.environ.get("STORAGE_JSON_PATH", str(ROOT_DIR / "state" / "storage.json")))
+STORAGE_JSON_PATH = _storage_json_path if _storage_json_path.is_absolute() else ROOT_DIR / _storage_json_path
+_telemetry_json_path = Path(os.environ.get("TELEMETRY_JSON_PATH", str(ROOT_DIR / "state" / "telemetry.json")))
+TELEMETRY_JSON_PATH = _telemetry_json_path if _telemetry_json_path.is_absolute() else ROOT_DIR / _telemetry_json_path
 FILEBEAT_INDEX = os.environ.get("FILEBEAT_INDEX", "filebeat-*")
 PACKETBEAT_INDEX = os.environ.get("PACKETBEAT_INDEX", "packetbeat-*")
 METRICBEAT_INDEX = os.environ.get("METRICBEAT_INDEX", ".ds-metricbeat-*")

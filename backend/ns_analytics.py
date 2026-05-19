@@ -6,7 +6,6 @@ from typing import Any
 try:
     from .ns_config import (
         AI_ALERTS_INDEX,
-        PACKETBEAT_INDEX,
         START_TIME,
         alert_signature,
         alert_source_type,
@@ -20,7 +19,6 @@ try:
 except ImportError:
     from ns_config import (
         AI_ALERTS_INDEX,
-        PACKETBEAT_INDEX,
         START_TIME,
         alert_signature,
         alert_source_type,
@@ -35,23 +33,25 @@ except ImportError:
 
 try:
     from .ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, HOSTS
-    from .ns_elastic import elastic_configured, elastic_request
-    from .ns_ingest import (
+    from .ns_telemetry import (
+        aggregate_packetbeat_traffic as aggregate_telemetry_traffic,
         fetch_ai_runtime_status,
         fetch_elastic_alerts,
         fetch_elastic_logs,
         fetch_metricbeat_hosts,
         fetch_packetbeat_events,
+        telemetry_health,
     )
 except ImportError:
     from ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, HOSTS
-    from ns_elastic import elastic_configured, elastic_request
-    from ns_ingest import (
+    from ns_telemetry import (
+        aggregate_packetbeat_traffic as aggregate_telemetry_traffic,
         fetch_ai_runtime_status,
         fetch_elastic_alerts,
         fetch_elastic_logs,
         fetch_metricbeat_hosts,
         fetch_packetbeat_events,
+        telemetry_health,
     )
 
 
@@ -96,47 +96,7 @@ def traffic_data() -> list[dict]:
 
 
 def aggregate_packetbeat_traffic() -> list[dict]:
-    payload = {
-        "size": 0,
-        "query": {"range": {"@timestamp": {"gte": "now-24h", "lte": "now"}}},
-        "aggs": {
-            "traffic_over_time": {
-                "date_histogram": {"field": "@timestamp", "fixed_interval": "1h", "min_doc_count": 0},
-                "aggs": {
-                    "inbound_bytes": {"sum": {"field": "source.bytes"}},
-                    "outbound_bytes": {"sum": {"field": "destination.bytes"}},
-                },
-            }
-        },
-    }
-    result = elastic_request("GET", f"/{PACKETBEAT_INDEX}/_search", payload)
-    buckets = ((((result or {}).get("aggregations") or {}).get("traffic_over_time") or {}).get("buckets")) or []
-    if not buckets:
-        return traffic_data()
-
-    alerts = current_alerts()
-    points = []
-    for bucket in buckets:
-        dt = parse_dt(bucket.get("key_as_string"))
-        hour_alerts = [
-            item for item in alerts
-            if parse_dt(item.get("timestamp")).replace(minute=0, second=0, microsecond=0) == dt.replace(minute=0, second=0, microsecond=0)
-        ]
-        anomalous = len(hour_alerts)
-        blocked = len([item for item in hour_alerts if normalize_text(item.get("status"), "open") in {"resolved", "blocked"}])
-        inbound = int((((bucket.get("inbound_bytes") or {}).get("value")) or 0) / 1024)
-        outbound = int((((bucket.get("outbound_bytes") or {}).get("value")) or 0) / 1024)
-        points.append(
-            {
-                "time": dt.strftime("%H:%M"),
-                "timestamp": iso(dt),
-                "inbound": max(inbound, 0),
-                "outbound": max(outbound, 0),
-                "blocked": blocked,
-                "anomalous": anomalous,
-            }
-        )
-    return points
+    return aggregate_telemetry_traffic(traffic_data(), current_alerts())
 
 
 def derive_attacking_ips(alerts: list[dict]) -> list[dict]:
@@ -365,20 +325,21 @@ def derive_pipeline_health(logs: list[dict], packet_events: list[dict], alerts: 
     uptime_seconds = int((now_utc() - START_TIME).total_seconds())
     host_cpu = min(95, max(5, int(sum(item["riskScore"] for item in hosts) / max(len(hosts), 1))))
     host_memory = min(95, 35 + max(0, len(logs) // 3))
-    elastic_health = elastic_request("GET", "/_cluster/health") if elastic_configured() else None
+    telemetry_status = telemetry_health()
     services = [
         {"name": "Packetbeat", "type": "collector", "status": "healthy" if packet_events else "degraded", "cpu": host_cpu, "memory": host_memory},
         {"name": "Filebeat", "type": "collector", "status": "healthy" if logs else "degraded", "cpu": max(10, host_cpu - 5), "memory": max(10, host_memory - 8)},
         {"name": "AI inference service", "type": "analysis", "status": "healthy" if alerts else "degraded", "cpu": max(10, host_cpu - 8), "memory": max(10, host_memory - 12)},
         {"name": "NetSentinel API", "type": "api", "status": "healthy", "cpu": max(5, host_cpu - 15), "memory": max(10, host_memory - 15)},
     ]
-    if elastic_health:
-        elastic_status = normalize_text(elastic_health.get("status"), "healthy").strip().lower()
-        if elastic_status == "yellow":
-            elastic_status = "degraded"
-        elif elastic_status == "red":
-            elastic_status = "down"
-        services.insert(2, {"name": "Elasticsearch", "type": "storage", "status": elastic_status, "cpu": max(10, host_cpu - 3), "memory": min(98, host_memory + 8)})
+    if telemetry_status.get("configured"):
+        backend = normalize_text(telemetry_status.get("backend"), "telemetry")
+        health_status = "healthy" if telemetry_status.get("reachable") else "degraded"
+        details = telemetry_status.get("details") or {}
+        if backend == "elastic" and isinstance(details, dict):
+            elastic_status = normalize_text(details.get("status"), "healthy").strip().lower()
+            health_status = "degraded" if elastic_status == "yellow" else ("down" if elastic_status == "red" else "healthy")
+        services.insert(2, {"name": f"{backend.title()} telemetry", "type": "storage", "status": health_status, "cpu": max(10, host_cpu - 3), "memory": min(98, host_memory + 8)})
     throughput = max(len(packet_events), len(logs), len(alerts)) * 10
     return {"services": services, "ingestionLag": max(10, 200 - min(len(packet_events) * 3, 150)), "queueDepth": max(0, len(alerts) - len(hosts)), "droppedEvents": 0 if logs and packet_events else 1, "throughput": throughput, "uptime": round(min(99.9, 95 + uptime_seconds / 20000), 2)}
 

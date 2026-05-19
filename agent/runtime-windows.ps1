@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProtectedProcessNames = @("system", "smss", "csrss", "wininit", "services", "lsass", "svchost", "winlogon", "explorer", "powershell", "pwsh", "filebeat", "packetbeat", "metricbeat", "winlogbeat")
 
 function Get-UtcNow {
   return ([DateTime]::UtcNow.ToString("o"))
@@ -29,6 +30,42 @@ function Append-Ndjson {
   param([hashtable]$Payload)
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $SignalLogPath) | Out-Null
   ($Payload | ConvertTo-Json -Depth 8 -Compress) + "`n" | Out-File -FilePath $SignalLogPath -Append -Encoding utf8
+}
+
+function Test-SafeIp {
+  param([string]$Ip)
+  $parsed = $null
+  if (-not [System.Net.IPAddress]::TryParse($Ip, [ref]$parsed)) {
+    return $false
+  }
+  if ([System.Net.IPAddress]::IsLoopback($parsed)) {
+    return $false
+  }
+  $bytes = $parsed.GetAddressBytes()
+  if ($bytes.Length -eq 4 -and ($bytes[0] -eq 0 -or $bytes[0] -ge 224)) {
+    return $false
+  }
+  return $true
+}
+
+function Test-SafeProcessName {
+  param([string]$Name)
+  if (-not $Name -or $Name -notmatch '^[A-Za-z0-9_.-]{1,64}$') {
+    return $false
+  }
+  return -not ($ProtectedProcessNames -contains $Name.ToLower())
+}
+
+function Test-SafePid {
+  param([int]$Pid)
+  if ($Pid -le 4) {
+    return $false
+  }
+  $process = Get-Process -Id $Pid -ErrorAction SilentlyContinue
+  if (-not $process) {
+    return $false
+  }
+  return -not ($ProtectedProcessNames -contains $process.ProcessName.ToLower())
 }
 
 function Get-SignalSnapshot {
@@ -132,25 +169,39 @@ function Invoke-LocalAction {
     switch ($Action.type) {
       "block_ip" {
         $ip = $Action.parameters.ip
+        if (-not (Test-SafeIp -Ip $ip)) {
+          throw "Refusing unsafe or invalid IP value."
+        }
         netsh advfirewall firewall add rule name="NetSentinel-$ip" dir=in action=block remoteip=$ip | Out-Null
         $result.success = $true
         $result.output = "Blocked $ip locally."
       }
       "unblock_ip" {
         $ip = $Action.parameters.ip
+        if (-not (Test-SafeIp -Ip $ip)) {
+          throw "Refusing unsafe or invalid IP value."
+        }
         netsh advfirewall firewall delete rule name="NetSentinel-$ip" | Out-Null
         $result.success = $true
         $result.output = "Unblocked $ip locally."
       }
       "terminate_process_by_name" {
-        Stop-Process -Name $Action.parameters.name -Force -ErrorAction Stop
+        $name = [string]$Action.parameters.name
+        if (-not (Test-SafeProcessName -Name $name)) {
+          throw "Refusing unsafe or invalid process name."
+        }
+        Stop-Process -Name $name -Force -ErrorAction Stop
         $result.success = $true
-        $result.output = "Stopped process name $($Action.parameters.name)."
+        $result.output = "Stopped process name $name."
       }
       "terminate_process_by_pid" {
-        Stop-Process -Id ([int]$Action.parameters.pid) -Force -ErrorAction Stop
+        $pidValue = [int]$Action.parameters.pid
+        if (-not (Test-SafePid -Pid $pidValue)) {
+          throw "Refusing unsafe or invalid process id."
+        }
+        Stop-Process -Id $pidValue -Force -ErrorAction Stop
         $result.success = $true
-        $result.output = "Stopped PID $($Action.parameters.pid)."
+        $result.output = "Stopped PID $pidValue."
       }
       "collect_triage" {
         $artifact = Collect-Triage

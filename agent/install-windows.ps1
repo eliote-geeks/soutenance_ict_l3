@@ -11,6 +11,8 @@ param(
   [string]$ProfileId = "",
   [string]$AssetId = $env:COMPUTERNAME,
   [switch]$Resume,
+  [switch]$Upgrade,
+  [switch]$Uninstall,
   [int]$PollIntervalSeconds = 5,
   [int]$ApprovalTimeoutSeconds = 300,
   [string]$BeatsVersion = "8.17.3"
@@ -27,13 +29,101 @@ $runtimeScriptPath = Join-Path $beatsRoot "runtime-windows.ps1"
 $runtimeTaskName = "NetSentinelAgentRuntime"
 $runtimeIntervalSeconds = 300
 $downloadsRoot = Join-Path $env:TEMP "NetSentinelAgent"
+$beatServices = @("filebeat", "packetbeat", "metricbeat", "winlogbeat")
 $hostnameValue = $env:COMPUTERNAME
 $ipValue = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike "169.254*" -and $_.IPAddress -ne "127.0.0.1" } | Select-Object -First 1 -ExpandProperty IPAddress)
 if (-not $ipValue) { $ipValue = "127.0.0.1" }
 $osValue = (Get-CimInstance Win32_OperatingSystem).Caption
 
-New-Item -ItemType Directory -Force -Path $beatsRoot | Out-Null
-New-Item -ItemType Directory -Force -Path $downloadsRoot | Out-Null
+function Test-IsAdministrator {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+  return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Assert-Administrator {
+  if (-not (Test-IsAdministrator)) {
+    throw "$AgentName must be run from an elevated PowerShell session."
+  }
+}
+
+function Assert-Url {
+  param([string]$Name, [string]$Value)
+  if (-not $Value -or $Value -notmatch '^https?://') {
+    throw "$Name must start with http:// or https://"
+  }
+}
+
+function Assert-ApiReachable {
+  Assert-Url -Name "-ApiUrl" -Value $ApiUrl
+  try {
+    Invoke-RestMethod -Method Get -Uri "$ApiUrl/health" -TimeoutSec 10 | Out-Null
+  } catch {
+    throw "Unable to reach NetSentinel API at $ApiUrl/health: $($_.Exception.Message)"
+  }
+}
+
+function Assert-ElasticCredentials {
+  if ($ApiKey) {
+    return
+  }
+  if ($Username -and $Password -and $env:NETSENTINEL_ALLOW_BASIC_AUTH -eq "true") {
+    return
+  }
+  throw "Elastic API key is required. Basic auth is blocked unless NETSENTINEL_ALLOW_BASIC_AUTH=true."
+}
+
+function Protect-Path {
+  param([string]$Path)
+  if (-not (Test-Path $Path)) {
+    return
+  }
+  if ((Get-Item $Path).PSIsContainer) {
+    & icacls $Path /inheritance:r /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" | Out-Null
+  } else {
+    & icacls $Path /inheritance:r /grant:r "Administrators:F" "SYSTEM:F" | Out-Null
+  }
+}
+
+function Initialize-AgentDirectories {
+  New-Item -ItemType Directory -Force -Path $beatsRoot | Out-Null
+  New-Item -ItemType Directory -Force -Path $downloadsRoot | Out-Null
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $signalLogPath) | Out-Null
+  New-Item -ItemType Directory -Force -Path $triageDir | Out-Null
+  Protect-Path -Path $beatsRoot
+  Protect-Path -Path (Split-Path -Parent $signalLogPath)
+}
+
+function Stop-AgentService {
+  param([string]$ServiceName)
+  $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+  if ($service) {
+    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    Set-Service -Name $ServiceName -StartupType Disabled -ErrorAction SilentlyContinue
+  }
+}
+
+function Stop-RuntimeTask {
+  if (Get-ScheduledTask -TaskName $runtimeTaskName -ErrorAction SilentlyContinue) {
+    Stop-ScheduledTask -TaskName $runtimeTaskName -ErrorAction SilentlyContinue
+  }
+}
+
+function Uninstall-Agent {
+  Assert-Administrator
+  if (Get-ScheduledTask -TaskName $runtimeTaskName -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName $runtimeTaskName -Confirm:$false
+  }
+  foreach ($beat in $beatServices) {
+    $serviceName = (Get-Culture).TextInfo.ToTitleCase($beat)
+    Stop-AgentService -ServiceName $serviceName
+  }
+  Remove-Item -Force -ErrorAction SilentlyContinue "$beatsRoot\filebeat.yml", "$beatsRoot\packetbeat.yml", "$beatsRoot\metricbeat.yml", "$beatsRoot\winlogbeat.yml", $runtimeScriptPath
+  if ($env:NETSENTINEL_KEEP_STATE -ne "true") {
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $beatsRoot, (Split-Path -Parent $signalLogPath)
+  }
+  Write-Host "$AgentName removed. Set NETSENTINEL_KEEP_STATE=true to keep state during uninstall."
+}
 
 function Get-OutputBlock {
   if ($ApiKey) {
@@ -55,6 +145,8 @@ output.elasticsearch:
 }
 
 function Write-Configs {
+  Initialize-AgentDirectories
+  Assert-ElasticCredentials
   $commonFields = @"
 fields:
   site: "$Site"
@@ -69,11 +161,6 @@ tags: ["netsentinel", "$Role", "$Environment", "windows"]
   $filebeatConfig = @"
 filebeat.inputs:
   - type: filestream
-    id: windows-events
-    enabled: true
-    paths:
-      - C:\Windows\System32\winevt\Logs\*.evtx
-  - type: filestream
     id: netsentinel-agent-signals
     enabled: true
     paths:
@@ -81,6 +168,18 @@ filebeat.inputs:
     parsers:
       - ndjson:
           target: ""
+$commonFields
+$(Get-OutputBlock)
+"@
+
+  $winlogbeatConfig = @"
+winlogbeat.event_logs:
+  - name: Security
+    ignore_older: 72h
+  - name: System
+    ignore_older: 72h
+  - name: Application
+    ignore_older: 72h
 $commonFields
 $(Get-OutputBlock)
 "@
@@ -109,8 +208,10 @@ $(Get-OutputBlock)
 "@
 
   $filebeatConfig | Set-Content -Encoding UTF8 -Path "$beatsRoot\filebeat.yml"
+  $winlogbeatConfig | Set-Content -Encoding UTF8 -Path "$beatsRoot\winlogbeat.yml"
   $packetbeatConfig | Set-Content -Encoding UTF8 -Path "$beatsRoot\packetbeat.yml"
   $metricbeatConfig | Set-Content -Encoding UTF8 -Path "$beatsRoot\metricbeat.yml"
+  Protect-Path -Path $beatsRoot
 }
 
 function Save-State {
@@ -132,7 +233,9 @@ function Save-State {
     beats_version = $BeatsVersion
     runtime_heartbeat_interval_seconds = $runtimeIntervalSeconds
   }
+  Initialize-AgentDirectories
   $payload | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $stateFile
+  Protect-Path -Path $stateFile
 }
 
 function Load-State {
@@ -198,16 +301,18 @@ function Install-BeatService {
 
 function Install-Beats {
   Install-BeatService -BeatName "filebeat" -ConfigPath "$beatsRoot\filebeat.yml"
+  Install-BeatService -BeatName "winlogbeat" -ConfigPath "$beatsRoot\winlogbeat.yml"
   Install-BeatService -BeatName "packetbeat" -ConfigPath "$beatsRoot\packetbeat.yml"
   Install-BeatService -BeatName "metricbeat" -ConfigPath "$beatsRoot\metricbeat.yml"
 }
 
 function Install-AgentRuntime {
-  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $signalLogPath) | Out-Null
+  Initialize-AgentDirectories
   if (-not (Test-Path (Join-Path $PSScriptRoot "runtime-windows.ps1"))) {
     throw "runtime-windows.ps1 is missing beside the installer."
   }
   Copy-Item -Force -Path (Join-Path $PSScriptRoot "runtime-windows.ps1") -Destination $runtimeScriptPath
+  Protect-Path -Path $runtimeScriptPath
 }
 
 function Register-AgentRuntimeTask {
@@ -258,6 +363,7 @@ function Apply-Activation {
     $script:runtimeIntervalSeconds = [int]$runtime.heartbeat_interval_seconds
   }
 
+  Assert-ElasticCredentials
   Write-Configs
 
   try {
@@ -312,6 +418,30 @@ function Wait-ForApproval {
   Write-Host "Enrollment pending approval. Re-run with -Resume after admin approval."
 }
 
+if ($Uninstall) {
+  Uninstall-Agent
+  return
+}
+
+Assert-Administrator
+
+if ($Upgrade) {
+  $state = Load-State
+  $ApiUrl = $state.api_url
+  $AssetId = $state.asset_id
+  $ProfileId = $state.profile_id
+  if ($state.beats_version) {
+    $BeatsVersion = $state.beats_version
+  }
+  if ($state.runtime_heartbeat_interval_seconds) {
+    $runtimeIntervalSeconds = [int]$state.runtime_heartbeat_interval_seconds
+  }
+  Stop-RuntimeTask
+  Assert-ApiReachable
+  Wait-ForApproval -InstanceId $state.instance_id
+  return
+}
+
 if ($Resume) {
   $state = Load-State
   $ApiUrl = $state.api_url
@@ -323,6 +453,7 @@ if ($Resume) {
   if ($state.runtime_heartbeat_interval_seconds) {
     $runtimeIntervalSeconds = [int]$state.runtime_heartbeat_interval_seconds
   }
+  Assert-ApiReachable
   Wait-ForApproval -InstanceId $state.instance_id
   return
 }
@@ -331,6 +462,7 @@ if ($EnrollmentToken) {
   if (-not $ApiUrl) {
     throw "-ApiUrl is required with -EnrollmentToken"
   }
+  Assert-ApiReachable
   $enroll = Invoke-AgentApi -Path "/api/agent/enroll" -Payload @{
     token = $EnrollmentToken
     hostname = $hostnameValue
@@ -347,6 +479,8 @@ if ($EnrollmentToken) {
 if (-not $ElasticUrl) {
   throw "-ElasticUrl is required in direct mode"
 }
+Assert-Url -Name "-ElasticUrl" -Value $ElasticUrl
+Assert-ElasticCredentials
 
 Write-Configs
 try {

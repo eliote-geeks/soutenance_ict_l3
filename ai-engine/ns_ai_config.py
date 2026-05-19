@@ -29,6 +29,7 @@ def parse_dt(value: Any) -> datetime:
 
 
 ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "").rstrip("/")
+NETSENTINEL_TELEMETRY_BACKEND = os.environ.get("NETSENTINEL_TELEMETRY_BACKEND", "elastic" if ELASTICSEARCH_URL else "demo").strip().lower()
 ELASTICSEARCH_USERNAME = os.environ.get("ELASTICSEARCH_USERNAME")
 ELASTICSEARCH_PASSWORD = os.environ.get("ELASTICSEARCH_PASSWORD")
 ELASTICSEARCH_API_KEY = os.environ.get("ELASTICSEARCH_API_KEY")
@@ -54,5 +55,7 @@ ATTACK_DICT_SOURCE_URL = os.environ.get(
     "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json",
 )
 STATE_DIR = Path(os.environ.get("STATE_DIR", str(ROOT_DIR / "state")))
+_telemetry_json_path = Path(os.environ.get("TELEMETRY_JSON_PATH", str(ROOT_DIR / "state" / "telemetry.json")))
+TELEMETRY_JSON_PATH = _telemetry_json_path if _telemetry_json_path.is_absolute() else ROOT_DIR / _telemetry_json_path
 STATE_FILE = STATE_DIR / "finding_state.json"
 ATTACK_DICT_FILE = STATE_DIR / "attack_dictionary_enterprise.json"

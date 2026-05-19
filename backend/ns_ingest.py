@@ -7,6 +7,7 @@ try:
         AI_ALERTS_INDEX,
         AI_SERVICE_URL,
         FILEBEAT_INDEX,
+        INGEST_AI_ALERTS_INDEX,
         METRICBEAT_INDEX,
         PACKETBEAT_INDEX,
         alert_signature,
@@ -16,11 +17,13 @@ try:
         now_utc,
     )
     from .ns_elastic import elastic_request
+    from .ns_storage import fetch_documents as storage_fetch_documents
 except ImportError:
     from ns_config import (
         AI_ALERTS_INDEX,
         AI_SERVICE_URL,
         FILEBEAT_INDEX,
+        INGEST_AI_ALERTS_INDEX,
         METRICBEAT_INDEX,
         PACKETBEAT_INDEX,
         alert_signature,
@@ -30,6 +33,7 @@ except ImportError:
         now_utc,
     )
     from ns_elastic import elastic_request
+    from ns_storage import fetch_documents as storage_fetch_documents
 
 
 def parse_es_timestamp(value: Any) -> str:
@@ -235,6 +239,14 @@ def fetch_elastic_alerts() -> list[dict]:
     }
     result = elastic_request("GET", f"/{AI_ALERTS_INDEX}/_search", payload)
     hits = (((result or {}).get("hits") or {}).get("hits")) or []
+    if not hits:
+        hits = [
+            {"_id": item.get("id"), "_source": item}
+            for item in [
+                *storage_fetch_documents(INGEST_AI_ALERTS_INDEX, size=50),
+                *storage_fetch_documents(AI_ALERTS_INDEX, size=50),
+            ]
+        ]
     alerts = []
     for index, hit in enumerate(hits, start=1):
         source = hit.get("_source", {})

@@ -13,6 +13,8 @@ ENVIRONMENT="prod"
 PROFILE_ID=""
 ASSET_ID=""
 RESUME_ONLY="false"
+UNINSTALL_ONLY="false"
+UPGRADE_ONLY="false"
 POLL_INTERVAL_SECONDS=5
 APPROVAL_TIMEOUT_SECONDS=300
 AGENT_NAME="NetSentinel Agent"
@@ -33,6 +35,9 @@ if [[ ! -f "$RUNTIME_SOURCE_PATH" ]]; then
   RUNTIME_SOURCE_PATH="$SHARE_DIR/ns_agent_runtime.py"
 fi
 RUNTIME_HEARTBEAT_INTERVAL_SECONDS=300
+BEAT_SERVICES=(filebeat packetbeat metricbeat)
+
+umask 077
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -48,6 +53,8 @@ while [[ $# -gt 0 ]]; do
     --profile-id) PROFILE_ID="$2"; shift 2 ;;
     --asset-id) ASSET_ID="$2"; shift 2 ;;
     --resume) RESUME_ONLY="true"; shift 1 ;;
+    --upgrade) UPGRADE_ONLY="true"; shift 1 ;;
+    --uninstall) UNINSTALL_ONLY="true"; shift 1 ;;
     --poll-interval) POLL_INTERVAL_SECONDS="$2"; shift 2 ;;
     --approval-timeout) APPROVAL_TIMEOUT_SECONDS="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
@@ -67,12 +74,113 @@ fi
 
 ASSET_ID="${ASSET_ID:-$HOSTNAME_VALUE}"
 
+require_root() {
+  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+    echo "$AGENT_NAME must be run as root." >&2
+    exit 1
+  fi
+}
+
+require_command() {
+  local command="$1"
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "Missing required command: $command" >&2
+    exit 1
+  fi
+}
+
+validate_url() {
+  local name="$1"
+  local value="$2"
+  if [[ -z "$value" ]]; then
+    echo "$name is required." >&2
+    exit 1
+  fi
+  if [[ ! "$value" =~ ^https?:// ]]; then
+    echo "$name must start with http:// or https://." >&2
+    exit 1
+  fi
+}
+
+check_http_reachable() {
+  local name="$1"
+  local url="$2"
+  if ! curl -fsS --connect-timeout 5 --max-time 10 "$url" >/dev/null; then
+    echo "Unable to reach $name at $url" >&2
+    exit 1
+  fi
+}
+
+validate_elastic_credentials() {
+  if [[ -n "$API_KEY" ]]; then
+    return
+  fi
+  if [[ -n "$USERNAME" && -n "$PASSWORD" && "${NETSENTINEL_ALLOW_BASIC_AUTH:-false}" == "true" ]]; then
+    return
+  fi
+  echo "Elastic API key is required. Basic auth is blocked unless NETSENTINEL_ALLOW_BASIC_AUTH=true." >&2
+  exit 1
+}
+
+preflight_common() {
+  require_root
+  require_command curl
+  require_command python3
+  require_command systemctl
+  require_command apt-get
+  if [[ ! -d /run/systemd/system ]]; then
+    echo "systemd is required for the NetSentinel runtime service." >&2
+    exit 1
+  fi
+}
+
+preflight_api_mode() {
+  validate_url "--api-url" "$API_URL"
+  check_http_reachable "NetSentinel API" "$API_URL/health"
+}
+
+preflight_direct_mode() {
+  validate_url "--elastic-url" "$ELASTIC_URL"
+  validate_elastic_credentials
+}
+
+secure_paths() {
+  mkdir -p "$STATE_DIR" "$RUNTIME_INSTALL_DIR" "$SIGNAL_LOG_DIR" "$TRIAGE_DIR"
+  chmod 700 "$STATE_DIR" "$RUNTIME_INSTALL_DIR" "$SIGNAL_LOG_DIR" "$TRIAGE_DIR"
+}
+
+stop_service_if_exists() {
+  local service="$1"
+  if systemctl list-unit-files "$service.service" >/dev/null 2>&1; then
+    systemctl disable --now "$service.service" >/dev/null 2>&1 || true
+  fi
+}
+
+uninstall_agent() {
+  require_root
+  stop_service_if_exists netsentinel-agent-runtime
+  for service in "${BEAT_SERVICES[@]}"; do
+    stop_service_if_exists "$service"
+  done
+  rm -f "$RUNTIME_SERVICE_PATH"
+  systemctl daemon-reload || true
+  rm -rf "$RUNTIME_INSTALL_DIR"
+  rm -f /etc/filebeat/filebeat.yml /etc/packetbeat/packetbeat.yml /etc/metricbeat/metricbeat.yml
+  if [[ "${NETSENTINEL_KEEP_STATE:-false}" != "true" ]]; then
+    rm -rf "$STATE_DIR" "$SIGNAL_LOG_DIR"
+  fi
+  echo "$AGENT_NAME removed. Set NETSENTINEL_KEEP_STATE=true to keep state during uninstall."
+}
+
 mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
 
 install_beats() {
   apt-get update
   apt-get install -y curl gnupg apt-transport-https python3
+  rm -f /usr/share/keyrings/elastic-keyring.gpg
   curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elastic-keyring.gpg
+  chmod 0644 /usr/share/keyrings/elastic-keyring.gpg
   echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" > /etc/apt/sources.list.d/elastic-8.x.list
   apt-get update
   apt-get install -y filebeat packetbeat metricbeat
@@ -96,6 +204,8 @@ EOF
 }
 
 write_configs() {
+  secure_paths
+  validate_elastic_credentials
   COMMON_FIELDS=$(cat <<EOF
 fields:
   site: "$SITE"
@@ -158,6 +268,7 @@ metricbeat.modules:
 $COMMON_FIELDS
 $(write_output_block)
 EOF
+  chmod 600 /etc/filebeat/filebeat.yml /etc/packetbeat/packetbeat.yml /etc/metricbeat/metricbeat.yml
 }
 
 enable_beats() {
@@ -167,7 +278,7 @@ enable_beats() {
 }
 
 install_runtime_assets() {
-  mkdir -p "$RUNTIME_INSTALL_DIR" "$SIGNAL_LOG_DIR" "$TRIAGE_DIR"
+  secure_paths
   if [[ ! -f "$RUNTIME_SOURCE_PATH" ]]; then
     echo "Runtime source not found: $RUNTIME_SOURCE_PATH" >&2
     exit 1
@@ -218,6 +329,7 @@ payload = {
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, indent=2)
 PY
+  chmod 600 "$STATE_FILE"
 }
 
 load_state() {
@@ -306,6 +418,7 @@ apply_activation() {
     echo "Activation payload missing elastic URL." >&2
     exit 1
   fi
+  validate_elastic_credentials
   write_configs
   enable_beats
   install_runtime_assets
@@ -353,6 +466,18 @@ resume_enrollment() {
   wait_for_approval
 }
 
+upgrade_agent() {
+  load_state
+  if [[ -z "${INSTANCE_ID:-}" || -z "${API_URL:-}" ]]; then
+    echo "Saved state is incomplete." >&2
+    exit 1
+  fi
+  preflight_api_mode
+  stop_service_if_exists netsentinel-agent-runtime
+  install_beats
+  wait_for_approval
+}
+
 enroll_agent() {
   if [[ -z "$API_URL" || -z "$ENROLLMENT_TOKEN" ]]; then
     echo "--api-url and --enrollment-token are required for enrollment mode." >&2
@@ -384,12 +509,22 @@ direct_install() {
   echo "$AGENT_NAME $AGENT_VERSION installed directly for asset '$ASSET_ID' on '$HOSTNAME_VALUE'"
 }
 
-install_beats
-
-if [[ "$RESUME_ONLY" == "true" ]]; then
+if [[ "$UNINSTALL_ONLY" == "true" ]]; then
+  uninstall_agent
+elif [[ "$UPGRADE_ONLY" == "true" ]]; then
+  preflight_common
+  upgrade_agent
+elif [[ "$RESUME_ONLY" == "true" ]]; then
+  preflight_common
   resume_enrollment
 elif [[ -n "$ENROLLMENT_TOKEN" ]]; then
+  preflight_common
+  preflight_api_mode
+  install_beats
   enroll_agent
 else
+  preflight_common
+  preflight_direct_mode
+  install_beats
   direct_install
 fi

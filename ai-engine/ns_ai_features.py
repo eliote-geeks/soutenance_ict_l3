@@ -1,21 +1,53 @@
 import ipaddress
+import json
 from collections import defaultdict
 from datetime import timedelta, timezone
 from typing import Any
 
 try:
     from .ns_ai_clients import elastic_request
-    from .ns_ai_config import FILEBEAT_INDEX, LOOKBACK_MINUTES, PACKETBEAT_INDEX, iso, now_utc, parse_dt
+    from .ns_ai_config import FILEBEAT_INDEX, LOOKBACK_MINUTES, NETSENTINEL_TELEMETRY_BACKEND, PACKETBEAT_INDEX, TELEMETRY_JSON_PATH, iso, now_utc, parse_dt
 except ImportError:
     from ns_ai_clients import elastic_request
-    from ns_ai_config import FILEBEAT_INDEX, LOOKBACK_MINUTES, PACKETBEAT_INDEX, iso, now_utc, parse_dt
+    from ns_ai_config import FILEBEAT_INDEX, LOOKBACK_MINUTES, NETSENTINEL_TELEMETRY_BACKEND, PACKETBEAT_INDEX, TELEMETRY_JSON_PATH, iso, now_utc, parse_dt
 
 
 def lookback_gte(minutes: int) -> str:
     return iso(now_utc() - timedelta(minutes=minutes))
 
 
+def load_json_telemetry() -> dict[str, list[dict[str, Any]]]:
+    if NETSENTINEL_TELEMETRY_BACKEND != "json" or not TELEMETRY_JSON_PATH.exists():
+        return {}
+    try:
+        payload = json.loads(TELEMETRY_JSON_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {
+        str(key): [dict(item) for item in value if isinstance(item, dict)]
+        for key, value in payload.items()
+        if isinstance(value, list)
+    }
+
+
+def json_hits(primary_key: str, fallback_key: str, size: int) -> list[dict[str, Any]]:
+    rows = (load_json_telemetry().get(primary_key) or load_json_telemetry().get(fallback_key) or [])[:size]
+    hits = []
+    for index, row in enumerate(rows, start=1):
+        if "_source" in row:
+            hits.append(row)
+            continue
+        hits.append({"_id": row.get("id", f"{primary_key}-{index}"), "_source": row})
+    return hits
+
+
 def filebeat_hits(minutes: int = LOOKBACK_MINUTES, size: int = 500) -> list[dict[str, Any]]:
+    if NETSENTINEL_TELEMETRY_BACKEND == "json":
+        return json_hits("filebeat_hits", "logs", size)
+    if NETSENTINEL_TELEMETRY_BACKEND != "elastic":
+        return []
     payload = {
         "size": size,
         "sort": [{"@timestamp": {"order": "desc"}}],
@@ -37,6 +69,10 @@ def filebeat_hits(minutes: int = LOOKBACK_MINUTES, size: int = 500) -> list[dict
 
 
 def packetbeat_hits(minutes: int = LOOKBACK_MINUTES, size: int = 1000) -> list[dict[str, Any]]:
+    if NETSENTINEL_TELEMETRY_BACKEND == "json":
+        return json_hits("packetbeat_hits", "packet_events", size)
+    if NETSENTINEL_TELEMETRY_BACKEND != "elastic":
+        return []
     payload = {
         "size": size,
         "sort": [{"@timestamp": {"order": "desc"}}],

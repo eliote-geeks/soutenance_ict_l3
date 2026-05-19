@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
+import re
 import socket
 import subprocess
 import time
@@ -20,6 +22,21 @@ SUSPICIOUS_PROCESS_TERMS = ("nmap", "netcat", "nc", "socat", "rclone", "scp", "r
 PRIVILEGE_TERMS = ("sudo", "pkexec", "setuid", "runas")
 EVASION_TERMS = ("history -c", "setenforce 0", "auditctl", "iptables -f", "systemctl stop", "killall auditd")
 PHISHING_TERMS = (".docm", ".xlsm", "attachment", "macro", "credential", "mail")
+SAFE_PROCESS_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+PROTECTED_PROCESS_NAMES = {
+    "systemd",
+    "init",
+    "sshd",
+    "sudo",
+    "python",
+    "python3",
+    "bash",
+    "sh",
+    "filebeat",
+    "packetbeat",
+    "metricbeat",
+    "netsentinel-agent-runtime",
+}
 
 
 def utc_now() -> str:
@@ -52,6 +69,38 @@ def run_command_result(command: list[str], timeout: int = 20) -> tuple[int, str]
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return 127, ""
     return result.returncode, (result.stdout or "") + ("\n" + result.stderr if result.stderr else "")
+
+
+def validate_action_ip(ip_value: str) -> tuple[bool, str]:
+    try:
+        parsed = ipaddress.ip_address(ip_value)
+    except ValueError:
+        return False, "Invalid IP value."
+    if parsed.is_loopback or parsed.is_multicast or parsed.is_unspecified:
+        return False, "Refusing to act on loopback, multicast or unspecified IP."
+    return True, str(parsed)
+
+
+def validate_process_name(value: str) -> tuple[bool, str]:
+    process_name = value.strip()
+    if not SAFE_PROCESS_NAME.fullmatch(process_name):
+        return False, "Invalid process name."
+    if process_name.lower() in PROTECTED_PROCESS_NAMES:
+        return False, f"Refusing to terminate protected process {process_name}."
+    return True, process_name
+
+
+def validate_pid(value: str) -> tuple[bool, str]:
+    try:
+        pid = int(value)
+    except ValueError:
+        return False, "Invalid process id."
+    if pid <= 1:
+        return False, "Refusing to terminate system process id."
+    code, output = run_command_result(["ps", "-p", str(pid), "-o", "comm="], timeout=10)
+    if code == 0 and output.strip().lower() in PROTECTED_PROCESS_NAMES:
+        return False, f"Refusing to terminate protected process {output.strip()}."
+    return True, str(pid)
 
 
 def source_ip_from_state(state: dict[str, Any]) -> str:
@@ -231,17 +280,18 @@ def collect_triage(output_dir: Path) -> Path:
 
 
 def apply_firewall_action(ip_value: str, remove: bool = False) -> tuple[bool, str]:
-    if not ip_value:
-        return False, "Missing IP value."
+    valid, normalized_ip = validate_action_ip(ip_value)
+    if not valid:
+        return False, normalized_ip
     if remove:
         commands = [
-            ["iptables", "-D", "INPUT", "-s", ip_value, "-j", "DROP"],
-            ["ufw", "delete", "deny", "from", ip_value],
+            ["iptables", "-D", "INPUT", "-s", normalized_ip, "-j", "DROP"],
+            ["ufw", "delete", "deny", "from", normalized_ip],
         ]
     else:
         commands = [
-            ["iptables", "-C", "INPUT", "-s", ip_value, "-j", "DROP"],
-            ["iptables", "-A", "INPUT", "-s", ip_value, "-j", "DROP"],
+            ["iptables", "-C", "INPUT", "-s", normalized_ip, "-j", "DROP"],
+            ["iptables", "-A", "INPUT", "-s", normalized_ip, "-j", "DROP"],
         ]
     for command in commands:
         code, output = run_command_result(command, timeout=15)
@@ -267,14 +317,20 @@ def execute_action(action: dict[str, Any], triage_output_dir: Path) -> dict[str,
         elif action_type == "unblock_ip":
             result["success"], result["output"] = apply_firewall_action(str(parameters.get("ip") or ""), remove=True)
         elif action_type == "terminate_process_by_name":
-            target = str(parameters.get("name") or "").strip()
-            code, output = run_command_result(["pkill", "-f", target], timeout=15)
-            result["success"] = bool(target) and code == 0
+            valid, target = validate_process_name(str(parameters.get("name") or ""))
+            if not valid:
+                result["error"] = target
+                return result
+            code, output = run_command_result(["pkill", "-x", target], timeout=15)
+            result["success"] = code == 0
             result["output"] = output.strip() or f"Requested termination for process name {target}."
         elif action_type == "terminate_process_by_pid":
-            pid = str(parameters.get("pid") or "").strip()
+            valid, pid = validate_pid(str(parameters.get("pid") or ""))
+            if not valid:
+                result["error"] = pid
+                return result
             code, output = run_command_result(["kill", "-9", pid], timeout=15)
-            result["success"] = bool(pid) and code == 0
+            result["success"] = code == 0
             result["output"] = output.strip() or f"Requested termination for pid {pid}."
         elif action_type == "collect_triage":
             artifact = collect_triage(triage_output_dir)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+import ipaddress
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -29,6 +31,34 @@ SIGNAL_INT_KEYS = {
     "external_destinations",
     "external_established_connections",
     "listening_ports",
+}
+
+SAFE_PROCESS_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+PROTECTED_PROCESS_NAMES = {
+    "system",
+    "systemd",
+    "init",
+    "smss",
+    "csrss",
+    "wininit",
+    "services",
+    "lsass",
+    "svchost",
+    "winlogon",
+    "explorer",
+    "sshd",
+    "sudo",
+    "python",
+    "python3",
+    "bash",
+    "sh",
+    "powershell",
+    "pwsh",
+    "filebeat",
+    "packetbeat",
+    "metricbeat",
+    "winlogbeat",
+    "netsentinel-agent-runtime",
 }
 
 
@@ -93,6 +123,44 @@ def sanitize_agent_signals(signals: dict[str, Any] | None) -> dict[str, Any]:
     return payload
 
 
+def validate_action_parameters(action_type: str, parameters: dict[str, Any] | None) -> dict[str, Any]:
+    payload = dict(parameters or {})
+    if action_type in {"block_ip", "unblock_ip"}:
+        raw_ip = normalize_text(payload.get("ip"), "").strip()
+        try:
+            parsed_ip = ipaddress.ip_address(raw_ip)
+        except ValueError as exc:
+            raise ValueError("A valid ip parameter is required.") from exc
+        if parsed_ip.is_loopback or parsed_ip.is_multicast or parsed_ip.is_unspecified:
+            raise ValueError("Loopback, multicast and unspecified IPs are not allowed for local firewall actions.")
+        payload["ip"] = str(parsed_ip)
+        return payload
+
+    if action_type == "terminate_process_by_name":
+        name = normalize_text(payload.get("name"), "").strip()
+        if not SAFE_PROCESS_NAME.fullmatch(name):
+            raise ValueError("A safe process name is required.")
+        if name.lower() in PROTECTED_PROCESS_NAMES:
+            raise ValueError(f"Refusing to queue termination for protected process {name}.")
+        payload["name"] = name
+        return payload
+
+    if action_type == "terminate_process_by_pid":
+        try:
+            pid = int(payload.get("pid"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("A valid pid parameter is required.") from exc
+        if pid <= 4:
+            raise ValueError("System process ids are not allowed.")
+        payload["pid"] = pid
+        return payload
+
+    if action_type == "collect_triage":
+        return {}
+
+    return payload
+
+
 def queue_agent_action(
     instance: dict[str, Any],
     *,
@@ -103,12 +171,13 @@ def queue_agent_action(
     normalized_type = normalize_text(action_type, "").strip().lower()
     if normalized_type not in SUPPORTED_AGENT_ACTIONS:
         raise ValueError(f"Unsupported agent action: {action_type}")
+    safe_parameters = validate_action_parameters(normalized_type, parameters)
 
     pending = instance.setdefault("pending_actions", [])
     action = {
         "id": f"action_{uuid.uuid4().hex[:12]}",
         "type": normalized_type,
-        "parameters": parameters or {},
+        "parameters": safe_parameters,
         "reason": normalize_text(reason, ""),
         "status": "pending",
         "created_at": iso(now_utc()),

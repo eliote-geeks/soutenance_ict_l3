@@ -57,6 +57,8 @@ try:
         ELASTICSEARCH_USERNAME,
         INGEST_AI_ALERTS_INDEX,
         NETSENTINEL_API_URL,
+        NETSENTINEL_STORAGE_BACKEND,
+        NETSENTINEL_TELEMETRY_BACKEND,
         PROFILE_ASSETS_INDEX,
         PROFILES_INDEX,
         alert_signature,
@@ -70,7 +72,7 @@ try:
     )
     from .ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, DEFAULT_ASSETS, DEFAULT_PROFILE_ASSETS, DEFAULT_PROFILES, HOSTS, TICKETS
     from .ns_elastic import ai_service_configured, elastic_configured, elastic_request
-    from .ns_ingest import elastic_events_from_logs, fetch_ai_runtime_status, fetch_elastic_alerts, fetch_elastic_logs, fetch_metricbeat_hosts, fetch_packetbeat_events
+    from .ns_ingest import elastic_events_from_logs, fetch_ai_runtime_status
     from .ns_schemas import (
         AIFindingIngest,
         AgentCheckinRequest,
@@ -86,6 +88,10 @@ try:
         ReportExportRequest,
         TicketRequest,
     )
+    from .ns_storage import fetch_documents as storage_fetch_documents
+    from .ns_storage import index_doc as storage_index_doc
+    from .ns_storage import storage_configured, storage_health
+    from .ns_telemetry import fetch_elastic_logs, fetch_packetbeat_events, telemetry_health
 except ImportError:
     from ns_agent import (
         apply_agent_action_results,
@@ -135,6 +141,8 @@ except ImportError:
         ELASTICSEARCH_USERNAME,
         INGEST_AI_ALERTS_INDEX,
         NETSENTINEL_API_URL,
+        NETSENTINEL_STORAGE_BACKEND,
+        NETSENTINEL_TELEMETRY_BACKEND,
         PROFILE_ASSETS_INDEX,
         PROFILES_INDEX,
         alert_signature,
@@ -148,7 +156,7 @@ except ImportError:
     )
     from ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, DEFAULT_ASSETS, DEFAULT_PROFILE_ASSETS, DEFAULT_PROFILES, HOSTS, TICKETS
     from ns_elastic import ai_service_configured, elastic_configured, elastic_request
-    from ns_ingest import elastic_events_from_logs, fetch_ai_runtime_status, fetch_elastic_alerts, fetch_elastic_logs, fetch_metricbeat_hosts, fetch_packetbeat_events
+    from ns_ingest import elastic_events_from_logs, fetch_ai_runtime_status
     from ns_schemas import (
         AIFindingIngest,
         AgentCheckinRequest,
@@ -164,6 +172,10 @@ except ImportError:
         ReportExportRequest,
         TicketRequest,
     )
+    from ns_storage import fetch_documents as storage_fetch_documents
+    from ns_storage import index_doc as storage_index_doc
+    from ns_storage import storage_configured, storage_health
+    from ns_telemetry import fetch_elastic_logs, fetch_packetbeat_events, telemetry_health
 
 
 app = FastAPI(title="NetSentinel AI API", version="0.1.0")
@@ -171,36 +183,16 @@ api_router = APIRouter(prefix="/api")
 
 
 def elastic_index_doc(index: str, doc_id: str, payload: dict[str, Any]) -> bool:
-    response = elastic_request("PUT", f"/{index}/_doc/{doc_id}", payload)
-    return bool(response)
+    return storage_index_doc(index, doc_id, payload)
 
 
 def fetch_index_documents(index: str, size: int = 200) -> list[dict[str, Any]]:
-    result = elastic_request(
-        "GET",
-        f"/{index}/_search",
-        {
-            "size": size,
-            "sort": [
-                {"created_at": {"order": "asc", "unmapped_type": "date"}},
-                {"name.keyword": {"order": "asc", "unmapped_type": "keyword"}},
-            ],
-            "_source": True,
-        },
-    )
-    hits = (((result or {}).get("hits") or {}).get("hits")) or []
-    documents: list[dict[str, Any]] = []
-    for hit in hits:
-        source = hit.get("_source") or {}
-        if "_id" not in source:
-            source["id"] = source.get("id") or hit.get("_id")
-        documents.append(source)
-    return documents
+    return storage_fetch_documents(index, size=size)
 
 
 def require_agent_storage() -> None:
-    if not elastic_configured():
-        raise HTTPException(status_code=503, detail="Agent enrollment requires Elasticsearch storage.")
+    if not storage_configured():
+        raise HTTPException(status_code=503, detail="Agent enrollment requires a configured storage backend.")
 
 
 def hash_agent_token(raw_token: str) -> str:
@@ -465,10 +457,12 @@ def scope_summary(scope: dict[str, Any]) -> dict[str, Any]:
 async def root():
     return {
         "name": "NetSentinel AI API",
-        "mode": "elastic-remote" if elastic_configured() else "demo-backed",
+        "mode": f"{NETSENTINEL_STORAGE_BACKEND}-storage" if storage_configured() else "demo-backed",
+        "storage": storage_health(),
+        "telemetry": telemetry_health(),
         "elastic_url": ELASTICSEARCH_URL or "remote-not-configured",
         "ai_service_url": AI_SERVICE_URL or "not-configured",
-        "message": "Use this API locally and connect Elasticsearch remotely on the VPS or lab server.",
+        "message": "Use NETSENTINEL_STORAGE_BACKEND to switch metadata storage without changing code.",
     }
 
 
@@ -477,6 +471,9 @@ async def health():
     elastic_ok = elastic_request("GET", "/_cluster/health") if elastic_configured() else None
     return {
         "status": "ok",
+        "storage": storage_health(),
+        "telemetry": telemetry_health(),
+        "telemetryBackend": NETSENTINEL_TELEMETRY_BACKEND,
         "elasticConfigured": elastic_configured(),
         "elasticReachable": bool(elastic_ok) if elastic_configured() else False,
         "aiServiceConfigured": ai_service_configured(),
@@ -511,8 +508,8 @@ async def profiles():
 @api_router.post("/profiles")
 async def create_profile(request: ProfileCreateRequest):
     document = {"id": request.id, "name": request.name, "type": request.type, "description": request.description, "created_at": iso(now_utc())}
-    stored = elastic_index_doc(PROFILES_INDEX, request.id, document) if elastic_configured() else False
-    return {"success": stored or not elastic_configured(), "profile": document}
+    stored = elastic_index_doc(PROFILES_INDEX, request.id, document) if storage_configured() else False
+    return {"success": stored or not storage_configured(), "profile": document}
 
 
 @api_router.get("/assets")
@@ -521,7 +518,7 @@ async def assets():
     links = fetch_profile_asset_links()
     profile_lookup = {item.get("id"): item for item in fetch_profiles_metadata()}
     agent_lookup: dict[str, dict[str, Any]] = {}
-    for instance in fetch_agent_instances() if elastic_configured() else []:
+    for instance in fetch_agent_instances() if storage_configured() else []:
         asset_key = normalize_text(instance.get("asset_id"), "")
         if not asset_key:
             continue
@@ -562,16 +559,16 @@ async def create_asset(request: AssetCreateRequest):
         "tags": request.tags or [],
         "created_at": iso(now_utc()),
     }
-    stored = elastic_index_doc(ASSETS_INDEX, request.id, document) if elastic_configured() else False
-    return {"success": stored or not elastic_configured(), "asset": document}
+    stored = elastic_index_doc(ASSETS_INDEX, request.id, document) if storage_configured() else False
+    return {"success": stored or not storage_configured(), "asset": document}
 
 
 @api_router.post("/profile-assets")
 async def assign_profile_asset(request: ProfileAssetCreateRequest):
     link_id = f"{request.profile_id}__{request.asset_id}"
     document = {"id": link_id, "profile_id": request.profile_id, "asset_id": request.asset_id, "created_at": iso(now_utc())}
-    stored = elastic_index_doc(PROFILE_ASSETS_INDEX, link_id, document) if elastic_configured() else False
-    return {"success": stored or not elastic_configured(), "assignment": document}
+    stored = elastic_index_doc(PROFILE_ASSETS_INDEX, link_id, document) if storage_configured() else False
+    return {"success": stored or not storage_configured(), "assignment": document}
 
 
 @api_router.post("/agent/enrollment-tokens")
@@ -1002,10 +999,10 @@ async def ingest_ai_finding(finding: AIFindingIngest):
             "signature": alert_signature(finding.title, finding.source_ip, finding.destination_ip, finding.hostname, finding.mitre_tactic),
         },
     )
-    if elastic_configured():
+    if storage_configured():
         document["source_type"] = alert_source_type(finding.title)
         document["signature"] = alert_signature(finding.title, finding.source_ip, finding.destination_ip, finding.hostname, finding.mitre_tactic)
-        elastic_request("POST", f"/{INGEST_AI_ALERTS_INDEX}/_doc", document)
+        elastic_index_doc(INGEST_AI_ALERTS_INDEX, alert_id, document)
     return {"success": True, "alertId": alert_id}
 
 
