@@ -151,7 +151,7 @@ def current_alerts() -> list[dict[str, Any]]:
 
 
 def current_hosts() -> list[dict[str, Any]]:
-    return fetch_metricbeat_hosts() or deepcopy(HOSTS)
+    return fetch_metricbeat_hosts()
 
 
 def alert_source_type(title: str | None) -> str:

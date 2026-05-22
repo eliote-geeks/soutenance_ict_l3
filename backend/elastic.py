@@ -17,7 +17,6 @@ from .config import (
     ASSETS_INDEX,
     PROFILE_ASSETS_INDEX,
 )
-from .data import DEFAULT_ASSETS, DEFAULT_PROFILE_ASSETS, DEFAULT_PROFILES
 from .utils import iso, normalize_text, parse_dt, parse_es_timestamp
 
 
@@ -304,21 +303,12 @@ def fetch_ai_runtime_status() -> dict[str, Any]:
 
 
 def fetch_profiles_metadata() -> list[dict[str, Any]]:
-    documents = fetch_index_documents(PROFILES_INDEX)
-    if documents:
-        return documents
-    return DEFAULT_PROFILES
+    return fetch_index_documents(PROFILES_INDEX)
 
 
 def fetch_assets_metadata() -> list[dict[str, Any]]:
-    documents = fetch_index_documents(ASSETS_INDEX)
-    if documents:
-        return documents
-    return DEFAULT_ASSETS
+    return fetch_index_documents(ASSETS_INDEX)
 
 
 def fetch_profile_asset_links() -> list[dict[str, Any]]:
-    documents = fetch_index_documents(PROFILE_ASSETS_INDEX)
-    if documents:
-        return documents
-    return DEFAULT_PROFILE_ASSETS
+    return fetch_index_documents(PROFILE_ASSETS_INDEX)

@@ -10,6 +10,7 @@ import {
   Activity,
   FileText,
   Shield,
+  Bot,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ const navItems = [
   { path: '/alerts',    icon: Bell,            label: 'Alerts',          badge: true  },
   { path: '/incidents', icon: AlertTriangle,   label: 'Incidents',       badge: false },
   { path: '/hosts',     icon: Server,          label: 'Assets / Hosts',  badge: false },
+  { path: '/agents',    icon: Bot,             label: 'Agents',          badge: false },
   { path: '/model',     icon: Brain,           label: 'AI Detection',    badge: false },
   { path: '/pipeline',  icon: Activity,        label: 'Stack Health',    badge: false },
   { path: '/reports',   icon: FileText,        label: 'Reports',         badge: false },
@@ -98,13 +100,13 @@ export const Sidebar = ({ collapsed, onToggle }) => {
                 <span className="truncate animate-fade-in">{item.label}</span>
               )}
 
-              {/* Alert count badge */}
-              {item.badge && !isCollapsed && (
+              {/* Alert count badge — only rendered when we have a real count */}
+              {item.badge && !isCollapsed && alertCount > 0 && (
                 <span className="ml-auto px-2 py-0.5 text-xs font-medium rounded-full bg-destructive/10 text-destructive">
-                  {alertCount ?? 3}
+                  {alertCount}
                 </span>
               )}
-              {item.badge && isCollapsed && (
+              {item.badge && isCollapsed && alertCount > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-destructive" />
               )}
             </NavLink>

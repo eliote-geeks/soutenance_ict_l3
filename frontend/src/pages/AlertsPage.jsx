@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { 
-  Bell, 
-  Check, 
-  Shield, 
-  Ban, 
-  Ticket, 
-  Filter,
+  Bell,
+  Check,
+  Shield,
+  Ban,
+  Ticket,
   ChevronDown,
   MoreHorizontal,
   Search,
@@ -388,9 +387,6 @@ export default function AlertsPage() {
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="icon" className="ml-auto">
-          <Filter className="w-4 h-4" />
-        </Button>
       </div>
 
       {/* Alerts List */}

@@ -7,6 +7,7 @@ import {
   Laptop,
   RefreshCw,
   ShieldX,
+  Terminal,
   UserCheck,
   UserX,
 } from 'lucide-react';
@@ -415,28 +416,83 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      {latestToken && (
-        <Card className="border-primary/20 bg-primary/5 shadow-soft">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Latest enrollment token</CardTitle>
-            <CardDescription>
-              Share this token once with the operator of {latestToken.asset_id}. It is not shown again after refresh.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1">
-              <div className="font-mono text-sm text-foreground break-all">{latestToken.raw_token}</div>
-              <div className="text-xs text-muted-foreground">
-                Expires {formatDateTime(latestToken.expires_at)}
+      {latestToken && (() => {
+        const apiUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8010';
+        const linuxCmd = `sudo bash install-linux.sh \\\n  --api-url ${apiUrl} \\\n  --enrollment-token ${latestToken.raw_token}`;
+        const winCmd = `.\\install-windows.ps1 \`\n  -ApiUrl ${apiUrl} \`\n  -EnrollmentToken ${latestToken.raw_token}`;
+        return (
+          <Card className="border-primary/20 bg-primary/5 shadow-soft">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Enrollment token — {latestToken.asset_id}
+              </CardTitle>
+              <CardDescription>
+                Token valid until {formatDateTime(latestToken.expires_at)}. Run the command below on the target machine from inside the <code className="font-mono">agent/</code> directory. The token is automatically copied to the clipboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Raw token */}
+              <div className="flex items-center gap-3">
+                <code className="flex-1 font-mono text-sm text-foreground bg-background border border-border rounded px-3 py-2 break-all">
+                  {latestToken.raw_token}
+                </code>
+                <Button variant="outline" size="sm" onClick={() => handleCopy(latestToken.raw_token, 'Enrollment token')}>
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
-            </div>
-            <Button variant="outline" onClick={() => handleCopy(latestToken.raw_token, 'Enrollment token')}>
-              <Copy className="h-4 w-4" />
-              Copy token
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+
+              {/* Install commands */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Terminal className="h-4 w-4 text-primary" />
+                  Install command
+                </div>
+
+                {/* Linux */}
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Linux (bash, root)</div>
+                  <div className="relative group">
+                    <pre className="font-mono text-xs bg-background border border-border rounded p-3 pr-12 overflow-x-auto whitespace-pre text-foreground">
+{`sudo bash install-linux.sh \\
+  --api-url ${apiUrl} \\
+  --enrollment-token ${latestToken.raw_token}`}
+                    </pre>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleCopy(linuxCmd.replace(/\\n/g, '\n'), 'Linux command')}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Windows */}
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Windows (PowerShell, Admin)</div>
+                  <div className="relative group">
+                    <pre className="font-mono text-xs bg-background border border-border rounded p-3 pr-12 overflow-x-auto whitespace-pre text-foreground">
+{`.\\install-windows.ps1 \`
+  -ApiUrl ${apiUrl} \`
+  -EnrollmentToken ${latestToken.raw_token}`}
+                    </pre>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleCopy(winCmd.replace(/\\n/g, '\n'), 'Windows command')}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="border-border/50 shadow-soft">

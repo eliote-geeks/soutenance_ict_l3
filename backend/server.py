@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from .scope import aggregate_scope_traffic
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException
+from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -89,6 +89,11 @@ from .schemas import (
     TicketRequest,
 )
 from .utils import iso, now_utc, normalize_text, parse_dt, percent_change
+from .ns_storage import storage_configured, storage_health
+from .ns_telemetry import telemetry_health
+from .ns_config import NETSENTINEL_STORAGE_BACKEND, NETSENTINEL_TELEMETRY_BACKEND
+from .ns_agent import pending_agent_actions, apply_agent_action_results, sanitize_agent_signals
+from .ns_schemas import AgentInstanceActionRequest, AgentCommandCreateRequest
 
 # Request/Response models
 class ChatbotRequest(BaseModel):
@@ -692,6 +697,14 @@ async def create_ticket(request: TicketRequest):
     ticket_id = f"TKT-{len(TICKETS) + 1001}"
     TICKETS.append({"ticketId": ticket_id, "alertId": request.alertId, "priority": request.priority, "assignee": request.assignee, "createdAt": iso(now_utc())})
     return {"success": True, "ticketId": ticket_id}
+
+
+@api_router.post("/admin/session")
+async def admin_session(x_admin_secret: str | None = Header(default=None)):
+    """Validate the admin secret and confirm the session is open."""
+    if x_admin_secret != ADMIN_API_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin secret")
+    return {"ok": True}
 
 
 @api_router.post("/reports/export")

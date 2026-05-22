@@ -35,7 +35,7 @@ except ImportError:
     )
 
 try:
-    from .ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, HOSTS
+    from .ns_demo_data import AI_FINDINGS_BUFFER, BLOCKED_IPS
     from .ns_telemetry import (
         aggregate_packetbeat_traffic as aggregate_telemetry_traffic,
         fetch_ai_runtime_status,
@@ -46,7 +46,7 @@ try:
         telemetry_health,
     )
 except ImportError:
-    from ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, HOSTS
+    from ns_demo_data import AI_FINDINGS_BUFFER, BLOCKED_IPS
     from ns_telemetry import (
         aggregate_packetbeat_traffic as aggregate_telemetry_traffic,
         fetch_ai_runtime_status,
@@ -59,7 +59,7 @@ except ImportError:
 
 
 def current_alerts() -> list[dict]:
-    raw = fetch_elastic_alerts() or deepcopy(AI_FINDINGS_BUFFER) or deepcopy(ALERTS)
+    raw = fetch_elastic_alerts() or deepcopy(AI_FINDINGS_BUFFER) or []
     enriched = []
     for item in raw:
         clone = dict(item)
@@ -77,7 +77,7 @@ def current_alerts() -> list[dict]:
 
 
 def current_hosts() -> list[dict]:
-    return fetch_metricbeat_hosts() or deepcopy(HOSTS)
+    return fetch_metricbeat_hosts()
 
 
 def traffic_data() -> list[dict]:
@@ -348,7 +348,7 @@ def derive_pipeline_health(logs: list[dict], packet_events: list[dict], alerts: 
 
 
 def risky_hosts() -> list[dict]:
-    return sorted(deepcopy(HOSTS), key=lambda item: item["riskScore"], reverse=True)[:5]
+    return sorted(current_hosts(), key=lambda item: item.get("riskScore", 0), reverse=True)[:5]
 
 
 def attacking_ips() -> list[dict]:
@@ -435,7 +435,7 @@ def ai_status() -> dict:
 
 
 def ai_findings() -> list[dict]:
-    alerts = fetch_elastic_alerts() or deepcopy(ALERTS)
+    alerts = fetch_elastic_alerts() or []
     findings = []
     for alert in alerts:
         findings.append({"findingId": alert["id"], "timestamp": alert["timestamp"], "title": alert["title"], "severity": alert["severity"], "hostname": alert["hostname"], "sourceIP": alert["sourceIP"], "confidence": 0.84 if alert["severity"] in {"critical", "high"} else 0.71, "recommendation": alert["recommendation"]})

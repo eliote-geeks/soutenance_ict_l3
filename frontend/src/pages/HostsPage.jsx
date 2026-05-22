@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Server, Search, Shield, AlertTriangle, Wifi, WifiOff, Download } from 'lucide-react';
+import { Server, Search, Shield, AlertTriangle, Wifi, WifiOff, Download, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,10 +31,12 @@ import {
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
-import { fetchHosts, isolateHost } from '@/lib/api';
+import { fetchHosts, fetchAssets, isolateHost, createAsset } from '@/lib/api';
 import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+const EMPTY_ASSET_FORM = { hostname: '', ip: '', os: 'Linux', role: 'Server', site: 'default-site' };
 
 export default function HostsPage() {
   const { scopeKey } = useScope();
@@ -35,22 +45,57 @@ export default function HostsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCriticality, setFilterCriticality] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [assetForm, setAssetForm] = useState(EMPTY_ASSET_FORM);
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadData = async () => {
+    try {
+      const [hostsResult, assetsResult] = await Promise.all([
+        fetchHosts().catch(() => ({ hosts: [] })),
+        fetchAssets().catch(() => ({ assets: [] })),
+      ]);
+      const liveHosts = hostsResult.hosts || [];
+      const registeredAssets = assetsResult.assets || [];
+      // Build a lookup of live Metricbeat hosts by hostname (lowercase)
+      const liveByHostname = Object.fromEntries(
+        liveHosts.map(h => [h.hostname.toLowerCase(), h])
+      );
+      // Start from registered assets, overlay live data where available
+      const registeredRows = registeredAssets.map(asset => {
+        const live = liveByHostname[asset.hostname?.toLowerCase()];
+        return live
+          ? { ...live, id: asset.id || live.id, role: asset.role || live.role }
+          : {
+              id: asset.id,
+              hostname: asset.hostname,
+              ip: asset.ip,
+              os: asset.os || 'Unknown',
+              role: asset.role || 'Asset',
+              riskScore: 0,
+              criticality: 'low',
+              lastSeen: asset.agentLastSeenAt || null,
+              alertCount: 0,
+              status: asset.agentStatus === 'active' ? 'online' : 'offline',
+              agent: asset.agentStatus === 'active' ? 'installed' : 'missing',
+            };
+      });
+      // Add live hosts not already in registered assets
+      const registeredHostnames = new Set(registeredAssets.map(a => a.hostname?.toLowerCase()));
+      const extraLive = liveHosts.filter(h => !registeredHostnames.has(h.hostname.toLowerCase()));
+      setHosts([...registeredRows, ...extraLive]);
+    } catch (error) {
+      console.error('Failed to load hosts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const result = await fetchHosts();
-        setHosts(result.hosts);
-      } catch (error) {
-        console.error('Failed to load hosts:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeKey]);
 
   const handleIsolate = async (hostname) => {
@@ -59,6 +104,43 @@ export default function HostsPage() {
       toast.success('Host isolated', { description: `${hostname} has been isolated` });
     } catch (error) {
       toast.error('Failed to isolate host');
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['hostname', 'ip', 'os', 'role', 'riskScore', 'criticality', 'status', 'lastSeen', 'agent'];
+    const rows = hosts.map(h =>
+      headers.map(k => JSON.stringify(h[k] ?? '')).join(',')
+    );
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `netsentinel-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Inventory exported');
+  };
+
+  const handleAddAsset = async (e) => {
+    e.preventDefault();
+    if (!assetForm.hostname.trim() || !assetForm.ip.trim()) {
+      toast.error('Hostname and IP are required');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const id = `asset_${assetForm.hostname.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+      await createAsset({ id, ...assetForm });
+      toast.success('Asset registered', { description: `${assetForm.hostname} added — go to Agents to create an enrollment token.` });
+      setAddDialogOpen(false);
+      setAssetForm(EMPTY_ASSET_FORM);
+      await loadData();
+    } catch (error) {
+      toast.error('Failed to register asset');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -126,10 +208,16 @@ export default function HostsPage() {
             Inventory of monitored servers, agents and exposed services
           </p>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export Inventory
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleExportCSV} disabled={hosts.length === 0}>
+            <Download className="w-4 h-4" />
+            Export CSV
+          </Button>
+          <Button className="gap-2" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Add Asset
+          </Button>
+        </div>
       </div>
 
       {/* Summary Stats */}
@@ -227,6 +315,77 @@ export default function HostsPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Add Asset Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Register Asset</DialogTitle>
+            <DialogDescription>
+              Add a new host or server to the monitored inventory.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddAsset} className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Hostname *</label>
+              <Input
+                value={assetForm.hostname}
+                onChange={e => setAssetForm(f => ({ ...f, hostname: e.target.value }))}
+                placeholder="e.g. web-server-01"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">IP Address *</label>
+              <Input
+                value={assetForm.ip}
+                onChange={e => setAssetForm(f => ({ ...f, ip: e.target.value }))}
+                placeholder="e.g. 192.168.1.10"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">OS</label>
+                <Select value={assetForm.os} onValueChange={v => setAssetForm(f => ({ ...f, os: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Linux">Linux</SelectItem>
+                    <SelectItem value="Windows Server">Windows Server</SelectItem>
+                    <SelectItem value="Windows 11">Windows 11</SelectItem>
+                    <SelectItem value="macOS">macOS</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Role</label>
+                <Input
+                  value={assetForm.role}
+                  onChange={e => setAssetForm(f => ({ ...f, role: e.target.value }))}
+                  placeholder="e.g. Web Server"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Site</label>
+              <Input
+                value={assetForm.site}
+                onChange={e => setAssetForm(f => ({ ...f, site: e.target.value }))}
+                placeholder="e.g. lab, dmz, prod"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Registering…' : 'Register Asset'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Hosts Table */}
       <Card className="border-border/50 shadow-soft">

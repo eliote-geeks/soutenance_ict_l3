@@ -60,13 +60,14 @@ const fetchJson = async (path, options) => {
 };
 
 const fetchAdminJson = async (path, options = {}) => {
+  const secret = getStoredAdminSecret();
   const headers = {
     ...(options.headers || {}),
+    ...(secret ? { 'X-Admin-Secret': secret } : {}),
   };
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
-    credentials: 'include',
   });
   if (!response.ok) {
     let detail = `API request failed with status ${response.status}`;
@@ -83,16 +84,21 @@ const fetchAdminJson = async (path, options = {}) => {
   return response.json();
 };
 
+const ADMIN_SECRET_KEY = 'netsentinel-admin-secret';
+
+const getStoredAdminSecret = () => {
+  try { return sessionStorage.getItem(ADMIN_SECRET_KEY) || ''; } catch { return ''; }
+};
+
 export const authenticateAdminSession = async (secret) => {
   const response = await fetch(`${API_BASE}/admin/session`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ secret }),
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
   });
   if (!response.ok) {
     throw new Error(`Admin authentication failed with status ${response.status}`);
   }
+  try { sessionStorage.setItem(ADMIN_SECRET_KEY, secret); } catch { /* ignore */ }
   return response.json();
 };
 
@@ -232,6 +238,18 @@ export const fetchAssets = async () => {
     };
   }
   return fetchJson('/assets');
+};
+
+export const createAsset = async (payload) => {
+  if (USE_MOCK) {
+    await delay(200);
+    return { success: true, asset: { ...payload } };
+  }
+  return fetchJson('/assets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 };
 
 export const fetchAgentInstances = async () => {

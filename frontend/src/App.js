@@ -7,13 +7,14 @@ import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
 import { Toaster } from '@/components/ui/sonner';
 import AIAssistant from '@/components/shared/AIAssistant';
 
-// ─── Active pages (9 pages kept after review) ───────────────────────────────
+// ─── Active pages ────────────────────────────────────────────────────────────
 import OverviewPage      from '@/pages/OverviewPage';
 import LiveStreamPage    from '@/pages/LiveStreamPage';
 import LogsExplorerPage  from '@/pages/LogsExplorerPage';
 import AlertsPage        from '@/pages/AlertsPage';
 import IncidentsPage     from '@/pages/IncidentsPage';
 import HostsPage         from '@/pages/HostsPage';
+import AgentsPage        from '@/pages/AgentsPage';
 import ModelPage         from '@/pages/ModelPage';
 import PipelinePage      from '@/pages/PipelinePage';
 import ReportsPage       from '@/pages/ReportsPage';
@@ -52,6 +53,7 @@ function App() {
                 <Route path="/alerts"    element={<AlertsPage />} />
                 <Route path="/incidents" element={<IncidentsPage />} />
                 <Route path="/hosts"     element={<HostsPage />} />
+                <Route path="/agents"    element={<AgentsPage />} />
                 <Route path="/model"     element={<ModelPage />} />
                 <Route path="/pipeline"  element={<PipelinePage />} />
                 <Route path="/reports"   element={<ReportsPage />} />

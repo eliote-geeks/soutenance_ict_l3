@@ -7,7 +7,6 @@ import {
   Radar
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
@@ -164,18 +163,15 @@ export default function IncidentsPage() {
             {/* Header Card */}
             <Card className="border-border/50 shadow-soft">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-mono text-sm text-muted-foreground">
-                        {selectedIncident.id}
-                      </span>
-                      <SeverityBadge severity={selectedIncident.severity} />
-                      <StatusBadge status={selectedIncident.status} />
-                    </div>
-                    <h2 className="text-xl font-bold">{selectedIncident.title}</h2>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-mono text-sm text-muted-foreground">
+                      {selectedIncident.id}
+                    </span>
+                    <SeverityBadge severity={selectedIncident.severity} />
+                    <StatusBadge status={selectedIncident.status} />
                   </div>
-                  <Button>Investigate</Button>
+                  <h2 className="text-xl font-bold">{selectedIncident.title}</h2>
                 </div>
                 
                 <div className="grid grid-cols-4 gap-4 mt-6">

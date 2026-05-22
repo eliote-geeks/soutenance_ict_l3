@@ -31,9 +31,9 @@ def hash_agent_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def assert_admin_secret(secret: str | None) -> None:
+def assert_admin_secret(secret: str | None, _request: Any = None) -> None:
     if secret != ADMIN_API_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid admin secret")
+        raise HTTPException(status_code=401, detail="Invalid or missing admin secret")
 
 
 def token_expired(token: dict[str, Any]) -> bool:

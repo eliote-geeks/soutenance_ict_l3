@@ -77,17 +77,11 @@ export default function OverviewPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">SOC Overview</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Unified view of Filebeat, Packetbeat, fail2ban and AI detections
-          </p>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
-          <span className="status-dot pulse bg-primary" />
-            <span className="text-sm font-medium text-primary">AI Inference Active</span>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">SOC Overview</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Unified view of Filebeat, Packetbeat, fail2ban and AI detections
+        </p>
       </div>
 
       {/* KPI Cards */}

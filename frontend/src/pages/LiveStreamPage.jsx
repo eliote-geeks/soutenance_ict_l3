@@ -61,6 +61,12 @@ export default function LiveStreamPage() {
     return () => clearInterval(interval);
   }, [isPaused, buffer, scopeKey]);
 
+  useEffect(() => {
+    if (isPaused || !scrollRef.current) return;
+    const viewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }, [events, isPaused]);
+
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString('en-US', { 

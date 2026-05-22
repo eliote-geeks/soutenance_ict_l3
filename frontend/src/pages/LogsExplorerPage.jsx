@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileSearch, Search, Calendar, Download, ChevronDown, ChevronRight, Filter, X } from 'lucide-react';
+import { FileSearch, Search, Calendar, Download, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,11 +82,20 @@ export default function LogsExplorerPage() {
   const filteredLogs = logs.filter(log => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return (
+      const matchesQuery = (
         log.message.toLowerCase().includes(query) ||
         log.source.toLowerCase().includes(query) ||
         JSON.stringify(log.fields).toLowerCase().includes(query)
       );
+      if (!matchesQuery) return false;
+    }
+    for (const chip of filterChips) {
+      if (chip.type === 'source') {
+        if (log.source !== chip.value) return false;
+      } else {
+        const fieldValue = String(log.fields[chip.type] ?? '');
+        if (fieldValue !== chip.value) return false;
+      }
     }
     return true;
   });
@@ -164,9 +173,6 @@ export default function LogsExplorerPage() {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" size="icon">
-              <Filter className="w-4 h-4" />
-            </Button>
           </div>
 
           {/* Filter chips */}
