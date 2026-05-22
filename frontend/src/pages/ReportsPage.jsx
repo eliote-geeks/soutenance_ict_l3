@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { FileText, Download, Calendar, Clock, CheckCircle } from 'lucide-react';
+import { FileText, Download, Calendar, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -26,32 +25,58 @@ const reportTypes = [
 ];
 
 const scheduledReports = [
-  { name: 'Weekly Executive Summary', schedule: 'Every Monday 9:00 AM', format: 'PDF', status: 'active' },
-  { name: 'Daily Threat Report', schedule: 'Every day 6:00 AM', format: 'PDF', status: 'active' },
-  { name: 'Monthly Compliance', schedule: 'First of month', format: 'PDF', status: 'active' },
+  { name: 'Weekly Executive Summary', schedule: 'Every Monday 9:00 AM', format: 'PDF' },
+  { name: 'Daily Threat Report', schedule: 'Every day 6:00 AM', format: 'PDF' },
+  { name: 'Monthly Compliance', schedule: 'First of month', format: 'PDF' },
 ];
+
+const formatRelative = (iso) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return new Date(iso).toLocaleDateString();
+};
 
 export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState('executive');
   const [dateRange, setDateRange] = useState('7d');
   const [format, setFormat] = useState('pdf');
   const [isExporting, setIsExporting] = useState(false);
+  const [generatedReports, setGeneratedReports] = useState([]);
 
   const handleExport = async () => {
     setIsExporting(true);
     try {
       await exportReport(selectedReport, { dateRange, format });
+      const reportType = reportTypes.find((r) => r.id === selectedReport);
+      setGeneratedReports((prev) => [
+        {
+          id: `rpt-${Date.now()}`,
+          name: `${reportType?.name} — ${new Date().toLocaleDateString('fr-FR')}`,
+          generatedAt: new Date().toISOString(),
+          format: format.toUpperCase(),
+          type: selectedReport,
+          dateRange,
+        },
+        ...prev,
+      ]);
       toast.success('Report exported', { description: 'Your report is ready for download' });
-    } catch (error) {
+    } catch {
       toast.error('Export failed', { description: 'Please try again later' });
     } finally {
       setIsExporting(false);
     }
   };
 
+  const lastGenerated = generatedReports[0]
+    ? formatRelative(generatedReports[0].generatedAt)
+    : 'Never';
+
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reports</h1>
@@ -71,17 +96,16 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Report type selection */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {reportTypes.map((report) => (
                 <div
                   key={report.id}
                   onClick={() => setSelectedReport(report.id)}
                   className={cn(
-                    "p-4 rounded-xl border cursor-pointer transition-all",
+                    'p-4 rounded-xl border cursor-pointer transition-all',
                     selectedReport === report.id
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50 hover:bg-muted/30"
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50 hover:bg-muted/30',
                   )}
                 >
                   <h4 className="font-medium text-sm">{report.name}</h4>
@@ -90,7 +114,6 @@ export default function ReportsPage() {
               ))}
             </div>
 
-            {/* Options */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Date Range</Label>
@@ -108,7 +131,7 @@ export default function ReportsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Format</Label>
                 <Select value={format} onValueChange={setFormat}>
@@ -122,10 +145,10 @@ export default function ReportsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="invisible">Action</Label>
-                <Button 
+                <Button
                   className="w-full gap-2"
                   onClick={handleExport}
                   disabled={isExporting}
@@ -138,29 +161,25 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* Quick Stats */}
+        {/* Session Stats */}
         <Card className="border-border/50 shadow-soft">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">
-              Report Statistics
+              Session Statistics
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Reports generated</span>
-              <span className="font-mono font-medium">247</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">This month</span>
-              <span className="font-mono font-medium">23</span>
+              <span className="text-sm text-muted-foreground">Generated this session</span>
+              <span className="font-mono font-medium">{generatedReports.length}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Scheduled active</span>
-              <span className="font-mono font-medium text-success">3</span>
+              <span className="font-mono font-medium text-success">{scheduledReports.length}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Last generated</span>
-              <span className="text-sm">2 hours ago</span>
+              <span className="text-sm">{lastGenerated}</span>
             </div>
           </CardContent>
         </Card>
@@ -183,8 +202,8 @@ export default function ReportsPage() {
               <div
                 key={index}
                 className={cn(
-                  "flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50",
-                  "opacity-0 animate-slide-up"
+                  'flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50',
+                  'opacity-0 animate-slide-up',
                 )}
                 style={{ animationDelay: `${index * 100}ms` }}
               >
@@ -210,41 +229,47 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      {/* Recent Reports */}
+      {/* Generated Reports (session) */}
       <Card className="border-border/50 shadow-soft">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">
-            Recent Reports
+            Reports Generated This Session
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {[
-              { name: 'Executive Summary - Week 4', date: 'Jan 28, 2025', format: 'PDF', size: '2.4 MB' },
-              { name: 'Daily Threat Report', date: 'Jan 27, 2025', format: 'PDF', size: '1.1 MB' },
-              { name: 'Incident Analysis - INC-00097', date: 'Jan 26, 2025', format: 'PDF', size: '856 KB' },
-              { name: 'Compliance Report - Q4', date: 'Jan 20, 2025', format: 'PDF', size: '4.2 MB' },
-            ].map((report, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{report.name}</p>
-                    <p className="text-xs text-muted-foreground">{report.date}</p>
+          {generatedReports.length === 0 ? (
+            <div className="py-8 text-center">
+              <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No reports generated yet. Use the form above to create your first report.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {generatedReports.map((report) => (
+                <div
+                  key={report.id}
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">{report.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatRelative(report.generatedAt)} · {report.dateRange}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline">{report.format}</Badge>
+                    <Button variant="ghost" size="sm">
+                      <Download className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">{report.size}</span>
-                  <Button variant="ghost" size="sm">
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

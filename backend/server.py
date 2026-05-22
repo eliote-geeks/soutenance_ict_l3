@@ -1,514 +1,103 @@
-import hashlib
-import hmac
-import ipaddress
-import os
-import secrets
 import uuid
 from copy import deepcopy
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
+from .scope import aggregate_scope_traffic
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException, Request, Response
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 from starlette.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-try:
-    from .ns_agent import (
-        apply_agent_action_results,
-        build_local_action_policy,
-        build_runtime_config,
-        pending_agent_actions,
-        queue_agent_action,
-        sanitize_agent_signals,
-    )
-    from .ns_analytics import (
-        aggregate_packetbeat_traffic,
-        ai_findings,
-        ai_attack_knowledge_base,
-        ai_recommendations,
-        ai_status,
-        anomaly_score,
-        attacking_ips,
-        current_alerts,
-        current_hosts,
-        derive_anomaly_score,
-        derive_attacking_ips,
-        derive_incidents,
-        derive_model_metrics,
-        derive_pipeline_health,
-        derive_predictions,
-        derive_realtime_metrics,
-        live_events,
-        logs_feed,
-        model_metrics,
-        pipeline_health,
-        predictions_data,
-        realtime_metrics,
-        risky_hosts,
-        traffic_data,
-    )
-    from .ns_config import (
-        ADMIN_API_SECRET,
-        AGENT_ELASTIC_API_KEY,
-        AGENT_INSTANCES_INDEX,
-        AGENT_TOKENS_INDEX,
-        AI_ALERTS_INDEX,
-        AI_SERVICE_URL,
-        ALLOW_AGENT_BASIC_AUTH,
-        ASSETS_INDEX,
-        ELASTICSEARCH_API_KEY,
-        ELASTICSEARCH_PASSWORD,
-        ELASTICSEARCH_URL,
-        ELASTICSEARCH_USERNAME,
-        INGEST_AI_ALERTS_INDEX,
-        NETSENTINEL_API_URL,
-        NETSENTINEL_STORAGE_BACKEND,
-        NETSENTINEL_TELEMETRY_BACKEND,
-        PROFILE_ASSETS_INDEX,
-        PROFILES_INDEX,
-        alert_signature,
-        allowed_origins,
-        alert_source_type,
-        iso,
-        normalize_text,
-        now_utc,
-        parse_dt,
-        percent_change,
-    )
-    from .ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, DEFAULT_ASSETS, DEFAULT_PROFILE_ASSETS, DEFAULT_PROFILES, HOSTS, TICKETS
-    from .ns_elastic import ai_service_configured, elastic_configured, elastic_request
-    from .ns_ingest import elastic_events_from_logs, fetch_ai_runtime_status
-    from .ns_schemas import (
-        AIFindingIngest,
-        AgentCheckinRequest,
-        AgentCommandCreateRequest,
-        AgentEnrollmentTokenCreateRequest,
-        AgentEnrollRequest,
-        AgentHeartbeatRequest,
-        AgentInstanceActionRequest,
-        AdminSessionRequest,
-        AssetCreateRequest,
-        BlockIPRequest,
-        ProfileAssetCreateRequest,
-        ProfileCreateRequest,
-        ReportExportRequest,
-        TicketRequest,
-    )
-    from .ns_storage import fetch_documents as storage_fetch_documents
-    from .ns_storage import index_doc as storage_index_doc
-    from .ns_storage import storage_configured, storage_health
-    from .ns_telemetry import fetch_elastic_logs, fetch_packetbeat_events, telemetry_health
-except ImportError:
-    from ns_agent import (
-        apply_agent_action_results,
-        build_local_action_policy,
-        build_runtime_config,
-        pending_agent_actions,
-        queue_agent_action,
-        sanitize_agent_signals,
-    )
-    from ns_analytics import (
-        aggregate_packetbeat_traffic,
-        ai_findings,
-        ai_attack_knowledge_base,
-        ai_recommendations,
-        ai_status,
-        anomaly_score,
-        attacking_ips,
-        current_alerts,
-        current_hosts,
-        derive_anomaly_score,
-        derive_attacking_ips,
-        derive_incidents,
-        derive_model_metrics,
-        derive_pipeline_health,
-        derive_predictions,
-        derive_realtime_metrics,
-        live_events,
-        logs_feed,
-        model_metrics,
-        pipeline_health,
-        predictions_data,
-        realtime_metrics,
-        risky_hosts,
-        traffic_data,
-    )
-    from ns_config import (
-        ADMIN_API_SECRET,
-        AGENT_ELASTIC_API_KEY,
-        AGENT_INSTANCES_INDEX,
-        AGENT_TOKENS_INDEX,
-        AI_ALERTS_INDEX,
-        AI_SERVICE_URL,
-        ALLOW_AGENT_BASIC_AUTH,
-        ASSETS_INDEX,
-        ELASTICSEARCH_API_KEY,
-        ELASTICSEARCH_PASSWORD,
-        ELASTICSEARCH_URL,
-        ELASTICSEARCH_USERNAME,
-        INGEST_AI_ALERTS_INDEX,
-        NETSENTINEL_API_URL,
-        NETSENTINEL_STORAGE_BACKEND,
-        NETSENTINEL_TELEMETRY_BACKEND,
-        PROFILE_ASSETS_INDEX,
-        PROFILES_INDEX,
-        alert_signature,
-        allowed_origins,
-        alert_source_type,
-        iso,
-        normalize_text,
-        now_utc,
-        parse_dt,
-        percent_change,
-    )
-    from ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, DEFAULT_ASSETS, DEFAULT_PROFILE_ASSETS, DEFAULT_PROFILES, HOSTS, TICKETS
-    from ns_elastic import ai_service_configured, elastic_configured, elastic_request
-    from ns_ingest import elastic_events_from_logs, fetch_ai_runtime_status
-    from ns_schemas import (
-        AIFindingIngest,
-        AgentCheckinRequest,
-        AgentCommandCreateRequest,
-        AgentEnrollmentTokenCreateRequest,
-        AgentEnrollRequest,
-        AgentHeartbeatRequest,
-        AgentInstanceActionRequest,
-        AdminSessionRequest,
-        AssetCreateRequest,
-        BlockIPRequest,
-        ProfileAssetCreateRequest,
-        ProfileCreateRequest,
-        ReportExportRequest,
-        TicketRequest,
-    )
-    from ns_storage import fetch_documents as storage_fetch_documents
-    from ns_storage import index_doc as storage_index_doc
-    from ns_storage import storage_configured, storage_health
-    from ns_telemetry import fetch_elastic_logs, fetch_packetbeat_events, telemetry_health
+from .agents import (
+    assert_admin_secret,
+    build_agent_activation,
+    ensure_asset_document,
+    ensure_profile_asset_assignment,
+    fetch_agent_enrollment_tokens,
+    fetch_agent_instances,
+    find_agent_enrollment_token,
+    find_agent_instance,
+    hash_agent_token,
+    require_agent_storage,
+    token_expired,
+)
+from .analytics import (
+    ai_findings,
+    ai_recommendations,
+    ai_status,
+    derive_attacking_ips,
+    derive_anomaly_score,
+    derive_incidents,
+    derive_model_metrics,
+    derive_predictions,
+    derive_pipeline_health,
+    derive_realtime_metrics,
+    elastic_events_from_logs,
+    live_events,
+    logs_feed,
+)
+from .config import (
+    ADMIN_API_SECRET,
+    AI_ALERTS_INDEX,
+    AI_SERVICE_URL,
+    AGENT_INSTANCES_INDEX,
+    AGENT_TOKENS_INDEX,
+    allowed_origins,
+    ASSETS_INDEX,
+    ELASTICSEARCH_URL,
+    INGEST_AI_ALERTS_INDEX,
+    NETSENTINEL_API_URL,
+    PROFILE_ASSETS_INDEX,
+    PROFILES_INDEX,
+)
+from .data import ALERTS, AI_FINDINGS_BUFFER, BLOCKED_IPS, HOSTS, TICKETS
+from .elastic import (
+    ai_service_configured,
+    elastic_configured,
+    elastic_index_doc,
+    elastic_request,
+    fetch_assets_metadata,
+    fetch_elastic_logs,
+    fetch_elastic_alerts,
+    fetch_packetbeat_events,
+    fetch_profile_asset_links,
+    fetch_profiles_metadata,
+)
+from .scope import (
+    alert_signature,
+    alert_source_type,
+    current_alerts,
+    current_hosts,
+    filter_alerts_by_scope,
+    filter_hosts_by_scope,
+    filter_logs_by_scope,
+    filter_packet_events_by_scope,
+    resolve_scope,
+    scope_summary,
+)
+from .schemas import (
+    AIFindingIngest,
+    AgentCheckinRequest,
+    AgentEnrollRequest,
+    AgentEnrollmentTokenCreateRequest,
+    AgentHeartbeatRequest,
+    AssetCreateRequest,
+    BlockIPRequest,
+    ProfileAssetCreateRequest,
+    ProfileCreateRequest,
+    ReportExportRequest,
+    TicketRequest,
+)
+from .utils import iso, now_utc, normalize_text, parse_dt, percent_change
 
+# Request/Response models
+class ChatbotRequest(BaseModel):
+    message: str
+    conversationHistory: list = None
+    isOnline: bool = True
 
 app = FastAPI(title="NetSentinel AI API", version="0.1.0")
 api_router = APIRouter(prefix="/api")
-ADMIN_SESSION_COOKIE = "netsentinel_admin_session"
-ADMIN_SESSION_TTL_SECONDS = int(os.environ.get("ADMIN_SESSION_TTL_SECONDS", "28800"))
-
-
-def elastic_index_doc(index: str, doc_id: str, payload: dict[str, Any]) -> bool:
-    return storage_index_doc(index, doc_id, payload)
-
-
-def fetch_index_documents(index: str, size: int = 200) -> list[dict[str, Any]]:
-    return storage_fetch_documents(index, size=size)
-
-
-def require_agent_storage() -> None:
-    if not storage_configured():
-        raise HTTPException(status_code=503, detail="Agent enrollment requires a configured storage backend.")
-
-
-def hash_agent_token(raw_token: str) -> str:
-    return hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
-
-
-def _sign_admin_session(payload: str) -> str:
-    return hmac.new(ADMIN_API_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
-
-
-def create_admin_session_token() -> str:
-    nonce = secrets.token_urlsafe(32)
-    issued_at = str(int(now_utc().timestamp()))
-    payload = f"{issued_at}.{nonce}"
-    return f"{payload}.{_sign_admin_session(payload)}"
-
-
-def valid_admin_session_token(token: str | None) -> bool:
-    if not token or token.count(".") != 2:
-        return False
-    issued_at_raw, nonce, signature = token.split(".", 2)
-    payload = f"{issued_at_raw}.{nonce}"
-    expected = _sign_admin_session(payload)
-    if not hmac.compare_digest(signature, expected):
-        return False
-    try:
-        issued_at = int(issued_at_raw)
-    except ValueError:
-        return False
-    return int(now_utc().timestamp()) - issued_at <= ADMIN_SESSION_TTL_SECONDS
-
-
-def assert_admin_secret(provided_secret: str | None, request: Request | None = None) -> None:
-    if provided_secret and hmac.compare_digest(provided_secret, ADMIN_API_SECRET):
-        return
-    cookie_token = request.cookies.get(ADMIN_SESSION_COOKIE) if request else None
-    if not valid_admin_session_token(cookie_token):
-        raise HTTPException(status_code=401, detail="Invalid admin secret.")
-
-
-@api_router.post("/admin/session")
-async def create_admin_session(request: AdminSessionRequest, response: Response):
-    assert_admin_secret(request.secret)
-    response.set_cookie(
-        ADMIN_SESSION_COOKIE,
-        create_admin_session_token(),
-        max_age=ADMIN_SESSION_TTL_SECONDS,
-        httponly=True,
-        secure=os.environ.get("ADMIN_SESSION_COOKIE_SECURE", "false").lower() == "true",
-        samesite=os.environ.get("ADMIN_SESSION_COOKIE_SAMESITE", "lax"),
-    )
-    return {"success": True}
-
-
-@api_router.delete("/admin/session")
-async def delete_admin_session(response: Response):
-    response.delete_cookie(ADMIN_SESSION_COOKIE)
-    return {"success": True}
-
-
-def token_expired(document: dict[str, Any]) -> bool:
-    expires_at = document.get("expires_at")
-    if not expires_at:
-        return False
-    return parse_dt(expires_at) <= now_utc()
-
-
-def fetch_agent_enrollment_tokens() -> list[dict[str, Any]]:
-    return fetch_index_documents(AGENT_TOKENS_INDEX, size=500)
-
-
-def fetch_agent_instances() -> list[dict[str, Any]]:
-    return fetch_index_documents(AGENT_INSTANCES_INDEX, size=500)
-
-
-def find_agent_enrollment_token(raw_token: str) -> dict[str, Any] | None:
-    hashed = hash_agent_token(raw_token)
-    for token in fetch_agent_enrollment_tokens():
-        if token.get("token_hash") == hashed:
-            return token
-    return None
-
-
-def find_agent_instance(instance_id: str) -> dict[str, Any] | None:
-    return next((item for item in fetch_agent_instances() if item.get("id") == instance_id), None)
-
-
-def agent_elastic_auth_payload() -> dict[str, Any]:
-    payload: dict[str, Any] = {"url": ELASTICSEARCH_URL}
-    api_key = AGENT_ELASTIC_API_KEY or ELASTICSEARCH_API_KEY
-    if api_key:
-        payload["api_key"] = api_key
-    elif ALLOW_AGENT_BASIC_AUTH and ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD:
-        payload["username"] = ELASTICSEARCH_USERNAME
-        payload["password"] = ELASTICSEARCH_PASSWORD
-    else:
-        raise HTTPException(
-            status_code=503,
-            detail="Agent credentials are not configured. Set AGENT_ELASTIC_API_KEY or explicitly allow basic auth.",
-        )
-    return payload
-
-
-def fetch_profiles_metadata() -> list[dict[str, Any]]:
-    documents = fetch_index_documents(PROFILES_INDEX)
-    if documents:
-        return documents
-    return deepcopy(DEFAULT_PROFILES)
-
-
-def fetch_assets_metadata() -> list[dict[str, Any]]:
-    documents = fetch_index_documents(ASSETS_INDEX)
-    if documents:
-        return documents
-    return deepcopy(DEFAULT_ASSETS)
-
-
-def fetch_profile_asset_links() -> list[dict[str, Any]]:
-    documents = fetch_index_documents(PROFILE_ASSETS_INDEX)
-    if documents:
-        return documents
-    return deepcopy(DEFAULT_PROFILE_ASSETS)
-
-
-def ensure_asset_document(
-    *,
-    asset_id: str,
-    hostname: str,
-    ip: str,
-    os_name: str,
-    role: str,
-    site: str,
-    environment: str,
-) -> dict[str, Any]:
-    existing = next((item for item in fetch_assets_metadata() if item.get("id") == asset_id), None)
-    if existing:
-        return existing
-    document = {
-        "id": asset_id,
-        "hostname": hostname,
-        "host_id": asset_id,
-        "ip": ip,
-        "os": os_name,
-        "role": role,
-        "site": site,
-        "environment": environment,
-        "tags": ["netsentinel-agent", role, environment],
-        "created_at": iso(now_utc()),
-    }
-    elastic_index_doc(ASSETS_INDEX, asset_id, document)
-    return document
-
-
-def ensure_profile_asset_assignment(profile_id: str | None, asset_id: str) -> None:
-    if not profile_id:
-        return
-    link_id = f"{profile_id}__{asset_id}"
-    if any(item.get("id") == link_id for item in fetch_profile_asset_links()):
-        return
-    elastic_index_doc(
-        PROFILE_ASSETS_INDEX,
-        link_id,
-        {
-            "id": link_id,
-            "profile_id": profile_id,
-            "asset_id": asset_id,
-            "created_at": iso(now_utc()),
-        },
-    )
-
-
-def build_agent_activation(instance: dict[str, Any]) -> dict[str, Any]:
-    asset_id = normalize_text(instance.get("asset_id"), "").strip()
-    if not asset_id:
-        raise HTTPException(status_code=400, detail="Agent instance is missing an asset_id.")
-    asset = next((item for item in fetch_assets_metadata() if item.get("id") == asset_id), None) or {}
-    return {
-        "agent": {
-            "name": "NetSentinel Agent",
-            "instance_id": instance.get("id"),
-            "status": instance.get("status"),
-            "approved_at": instance.get("approved_at"),
-            "version": instance.get("agent_version") or "unknown",
-        },
-        "asset": {
-            "id": asset_id,
-            "hostname": asset.get("hostname") or instance.get("hostname"),
-            "ip": asset.get("ip") or instance.get("ip"),
-            "os": asset.get("os") or instance.get("os"),
-            "role": asset.get("role") or instance.get("role") or "workstation",
-            "site": asset.get("site") or instance.get("site") or "default-site",
-            "environment": asset.get("environment") or instance.get("environment") or "prod",
-            "profile_id": instance.get("profile_id"),
-        },
-        "elastic": agent_elastic_auth_payload(),
-        "server": {"api_url": NETSENTINEL_API_URL},
-        "runtime": build_runtime_config(instance.get("os")),
-        "local_actions": build_local_action_policy(),
-    }
-
-
-def resolve_scope(profile_id: str | None = None, asset_id: str | None = None) -> dict[str, Any]:
-    profiles = fetch_profiles_metadata()
-    assets = fetch_assets_metadata()
-    links = fetch_profile_asset_links()
-    selected_profile = next((item for item in profiles if item.get("id") == profile_id), None) if profile_id else None
-    if asset_id:
-        selected_assets = [item for item in assets if item.get("id") == asset_id]
-    elif selected_profile:
-        allowed_asset_ids = {item.get("asset_id") for item in links if item.get("profile_id") == selected_profile.get("id")}
-        selected_assets = [item for item in assets if item.get("id") in allowed_asset_ids]
-    else:
-        selected_assets = assets
-    return {
-        "profile": selected_profile,
-        "assets": selected_assets,
-        "assetIds": {item.get("id") for item in selected_assets if item.get("id")},
-        "hostnames": {normalize_text(item.get("hostname"), "") for item in selected_assets if item.get("hostname")},
-        "ips": {normalize_text(item.get("ip"), "") for item in selected_assets if item.get("ip")},
-    }
-
-
-def filter_logs_by_scope(logs: list[dict[str, Any]], scope: dict[str, Any]) -> list[dict[str, Any]]:
-    if len(scope.get("assets") or []) == len(fetch_assets_metadata()):
-        return logs
-    hostnames = scope.get("hostnames") or set()
-    ips = scope.get("ips") or set()
-    filtered = []
-    for item in logs:
-        fields = item.get("fields") or {}
-        if normalize_text(fields.get("host"), "") in hostnames:
-            filtered.append(item)
-            continue
-        if normalize_text(fields.get("source_ip"), "") in ips or normalize_text(fields.get("destination_ip"), "") in ips:
-            filtered.append(item)
-    return filtered
-
-
-def filter_packet_events_by_scope(events: list[dict[str, Any]], scope: dict[str, Any]) -> list[dict[str, Any]]:
-    if len(scope.get("assets") or []) == len(fetch_assets_metadata()):
-        return events
-    hostnames = scope.get("hostnames") or set()
-    ips = scope.get("ips") or set()
-    filtered = []
-    for item in events:
-        if normalize_text(item.get("hostname"), "") in hostnames:
-            filtered.append(item)
-            continue
-        if normalize_text(item.get("sourceIP"), "") in ips or normalize_text(item.get("destIP"), "") in ips:
-            filtered.append(item)
-    return filtered
-
-
-def filter_alerts_by_scope(alerts: list[dict[str, Any]], scope: dict[str, Any]) -> list[dict[str, Any]]:
-    if len(scope.get("assets") or []) == len(fetch_assets_metadata()):
-        return alerts
-    hostnames = scope.get("hostnames") or set()
-    ips = scope.get("ips") or set()
-    filtered = []
-    for item in alerts:
-        if normalize_text(item.get("hostname"), "") in hostnames:
-            filtered.append(item)
-            continue
-        if normalize_text(item.get("sourceIP"), "") in ips or normalize_text(item.get("destIP"), "") in ips:
-            filtered.append(item)
-    return filtered
-
-
-def filter_hosts_by_scope(hosts: list[dict[str, Any]], scope: dict[str, Any]) -> list[dict[str, Any]]:
-    if len(scope.get("assets") or []) == len(fetch_assets_metadata()):
-        return hosts
-    hostnames = scope.get("hostnames") or set()
-    ips = scope.get("ips") or set()
-    return [item for item in hosts if normalize_text(item.get("hostname"), "") in hostnames or normalize_text(item.get("ip"), "") in ips]
-
-
-def aggregate_scope_traffic(packet_events: list[dict[str, Any]], alerts: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    if not packet_events:
-        return aggregate_packetbeat_traffic()
-    now = now_utc()
-    buckets = []
-    for hours_ago in range(23, -1, -1):
-        bucket_start = (now - timedelta(hours=hours_ago)).replace(minute=0, second=0, microsecond=0)
-        bucket_end = bucket_start + timedelta(hours=1)
-        scoped_packets = [item for item in packet_events if bucket_start <= parse_dt(item.get("timestamp")) < bucket_end]
-        scoped_alerts = [item for item in alerts if bucket_start <= parse_dt(item.get("timestamp")) < bucket_end]
-        buckets.append(
-            {
-                "timestamp": bucket_start.isoformat(),
-                "alerts": len(scoped_alerts),
-                "blocked": len([item for item in scoped_alerts if normalize_text(item.get("status"), "open") in {"resolved", "blocked"}]),
-                "inbound": len(scoped_packets) * 48,
-                "outbound": len(scoped_packets) * 36,
-            }
-        )
-    return buckets
-
-
-def scope_summary(scope: dict[str, Any]) -> dict[str, Any]:
-    assets = scope.get("assets") or []
-    profile = scope.get("profile")
-    return {
-        "type": "profile" if profile else ("asset" if len(assets) == 1 else "all"),
-        "profile": profile,
-        "assetCount": len(assets),
-        "assets": assets,
-    }
 
 
 @api_router.get("/")
@@ -655,8 +244,11 @@ async def create_agent_enrollment_token(request: AgentEnrollmentTokenCreateReque
 @api_router.get("/agent/enrollment-tokens")
 async def list_agent_enrollment_tokens(http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret, http_request)
-    return {"tokens": [{**token, "expired": token_expired(token)} for token in fetch_agent_enrollment_tokens()]}
+    assert_admin_secret(x_admin_secret)
+    tokens = []
+    for token in fetch_agent_enrollment_tokens():
+        tokens.append({**token, "expired": token_expired(token)})
+    return {"tokens": tokens}
 
 
 @api_router.post("/agent/enrollment-tokens/{token_id}/revoke")
@@ -1107,6 +699,30 @@ async def export_report(request: ReportExportRequest):
     report_name = f"{request.type}-report-{now_utc().strftime('%Y%m%d%H%M%S')}.pdf"
     return {"success": True, "downloadUrl": f"/downloads/{report_name}"}
 
+
+@api_router.post("/chatbot/ask")
+async def chatbot_ask(request: ChatbotRequest):
+    from .chatbot import get_chatbot_response
+
+    try:
+        print(f"[CHATBOT] Question: {request.message}")
+
+        result = get_chatbot_response(
+            question=request.message,
+            conversation_history=request.conversationHistory or [],
+            is_online=request.isOnline,
+        )
+
+        return result
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+
+        return {
+            "response": f"Server Error: {str(e)}",
+            "usedFallback": True,
+        }
 
 app.include_router(api_router)
 app.add_middleware(

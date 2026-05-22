@@ -49,6 +49,15 @@ const DEFAULT_USERS = [
   },
 ];
 
+const hashPassword = async (plaintext) => {
+  if (!plaintext) return '';
+  const encoded = new TextEncoder().encode(String(plaintext));
+  const buffer = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 const safeParse = (value, fallback) => {
   try {
     return JSON.parse(value);
@@ -88,6 +97,24 @@ export const AuthProvider = ({ children }) => {
   const [users, setUsers] = useState(() => readStorage(STORAGE_KEYS.users, DEFAULT_USERS));
   const [session, setSession] = useState(() => readStorage(STORAGE_KEYS.session, null));
 
+  // Migrate any plaintext passwords to SHA-256 hashes on first mount.
+  useEffect(() => {
+    const migrate = async () => {
+      const needsMigration = users.some((u) => u.password !== undefined);
+      if (!needsMigration) return;
+      const migrated = await Promise.all(
+        users.map(async (u) => {
+          if (u.password === undefined) return u;
+          const hash = await hashPassword(u.password);
+          const { password, ...rest } = u;
+          return { ...rest, passwordHash: hash };
+        }),
+      );
+      setUsers(migrated);
+    };
+    migrate();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -119,7 +146,12 @@ export const AuthProvider = ({ children }) => {
     await delay(250);
     const normalizedEmail = normalizeEmail(email);
     const matchedUser = users.find((item) => normalizeEmail(item.email) === normalizedEmail);
-    if (!matchedUser || matchedUser.password !== password) {
+    if (!matchedUser) {
+      throw new Error('Invalid email or password.');
+    }
+    const inputHash = await hashPassword(password);
+    const storedHash = matchedUser.passwordHash || await hashPassword(matchedUser.password || '');
+    if (inputHash !== storedHash) {
       throw new Error('Invalid email or password.');
     }
     if (matchedUser.status === 'suspended') {
@@ -143,7 +175,7 @@ export const AuthProvider = ({ children }) => {
     if (users.some((item) => normalizeEmail(item.email) === normalizedEmail)) {
       throw new Error('Email already exists.');
     }
-    const createdAt = new Date().toISOString();
+    const hash = await hashPassword(password);
     const newUser = {
       id: generateId(),
       name: name || 'New User',
@@ -153,9 +185,9 @@ export const AuthProvider = ({ children }) => {
       department: 'Network',
       title: 'SOC Analyst',
       phone: '',
-      createdAt,
+      createdAt: new Date().toISOString(),
       lastLogin: null,
-      password,
+      passwordHash: hash,
     };
     setUsers((prev) => [...prev, newUser]);
     setSession({ userId: newUser.id });
@@ -170,8 +202,9 @@ export const AuthProvider = ({ children }) => {
       throw new Error('No account found for this email.');
     }
     const tempPassword = generateTempPassword();
+    const hash = await hashPassword(tempPassword);
     setUsers((prev) => prev.map((item) => item.id === matchedUser.id
-      ? { ...item, password: tempPassword }
+      ? { ...item, passwordHash: hash }
       : item));
     return { tempPassword };
   };
@@ -199,11 +232,17 @@ export const AuthProvider = ({ children }) => {
       throw new Error('No active session.');
     }
     const matchedUser = users.find((item) => item.id === user.id);
-    if (!matchedUser || matchedUser.password !== currentPassword) {
+    if (!matchedUser) {
+      throw new Error('User not found.');
+    }
+    const currentHash = await hashPassword(currentPassword);
+    const storedHash = matchedUser.passwordHash || await hashPassword(matchedUser.password || '');
+    if (currentHash !== storedHash) {
       throw new Error('Current password is incorrect.');
     }
+    const nextHash = await hashPassword(nextPassword);
     setUsers((prev) => prev.map((item) => item.id === user.id
-      ? { ...item, password: nextPassword }
+      ? { ...item, passwordHash: nextHash }
       : item));
     return true;
   };
@@ -217,8 +256,8 @@ export const AuthProvider = ({ children }) => {
     if (users.some((item) => normalizeEmail(item.email) === normalizedEmail)) {
       throw new Error('Email already exists.');
     }
-    const createdAt = new Date().toISOString();
     const tempPassword = data.password || generateTempPassword();
+    const hash = await hashPassword(tempPassword);
     const newUser = {
       id: generateId(),
       name: data.name,
@@ -228,9 +267,9 @@ export const AuthProvider = ({ children }) => {
       department: data.department || 'Network',
       title: data.title || 'SOC Analyst',
       phone: data.phone || '',
-      createdAt,
+      createdAt: new Date().toISOString(),
       lastLogin: null,
-      password: tempPassword,
+      passwordHash: hash,
     };
     setUsers((prev) => [...prev, newUser]);
     return { user: newUser, tempPassword };
@@ -240,6 +279,13 @@ export const AuthProvider = ({ children }) => {
     await delay(150);
     setUsers((prev) => prev.map((item) => item.id === userId
       ? { ...item, ...updates }
+      : item));
+  };
+
+  const resetUserPassword = async (userId, newPassword) => {
+    const hash = await hashPassword(newPassword);
+    setUsers((prev) => prev.map((item) => item.id === userId
+      ? { ...item, passwordHash: hash }
       : item));
   };
 
@@ -278,6 +324,7 @@ export const AuthProvider = ({ children }) => {
         updatePassword,
         addUser,
         updateUser,
+        resetUserPassword,
         removeUser,
         toggleUserStatus,
       }}
