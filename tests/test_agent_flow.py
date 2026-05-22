@@ -65,6 +65,54 @@ class AgentFlowTestCase(unittest.TestCase):
     def _admin_headers(self):
         return {"x-admin-secret": "test-secret"}
 
+    def test_admin_cookie_session_can_authorize_agent_admin_endpoints(self):
+        login = self.client.post("/api/admin/session", json={"secret": "test-secret"})
+        self.assertEqual(login.status_code, 200)
+
+        response = self.client.get("/api/agent/enrollment-tokens")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["tokens"], [])
+
+    def test_dangerous_local_action_requires_explicit_confirmation(self):
+        token = self.client.post(
+            "/api/agent/enrollment-tokens",
+            headers=self._admin_headers(),
+            json={
+                "asset_id": "asset_lab_01",
+                "profile_id": "profile_lab",
+                "site": "yaounde-lab",
+                "role": "workstation",
+                "environment": "lab",
+                "expires_in_minutes": 30,
+                "single_use": True,
+            },
+        )
+        raw_token = token.json()["token"]["raw_token"]
+        enroll = self.client.post(
+            "/api/agent/enroll",
+            json={
+                "token": raw_token,
+                "hostname": "lab-client-01",
+                "ip": "10.10.3.11",
+                "os": "Windows 11",
+                "agent_version": "1.1.0",
+            },
+        )
+        instance_id = enroll.json()["instance"]["id"]
+        self.client.post(f"/api/agent/instances/{instance_id}/approve", headers=self._admin_headers())
+
+        response = self.client.post(
+            f"/api/agent/instances/{instance_id}/actions",
+            headers=self._admin_headers(),
+            json={
+                "action_type": "block_ip",
+                "parameters": {"ip": "185.227.134.41"},
+                "reason": "Contain SSH brute force source.",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("confirmation", response.json()["detail"])
+
     def test_multi_machine_flow_with_approval_rejection_and_disable(self):
         token_a = self.client.post(
             "/api/agent/enrollment-tokens",
@@ -171,6 +219,7 @@ class AgentFlowTestCase(unittest.TestCase):
                 "action_type": "block_ip",
                 "parameters": {"ip": "185.227.134.41"},
                 "reason": "Contain SSH brute force source.",
+                "confirmation": "CONFIRM_LOCAL_ACTION",
             },
         )
         self.assertEqual(queued_action.status_code, 200)

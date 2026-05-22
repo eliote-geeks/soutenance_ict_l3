@@ -72,6 +72,7 @@ def percent_change(current: int | float, previous: int | float) -> str:
 START_TIME = now_utc()
 NETSENTINEL_STORAGE_BACKEND = os.environ.get("NETSENTINEL_STORAGE_BACKEND", "").strip().lower()
 NETSENTINEL_TELEMETRY_BACKEND = os.environ.get("NETSENTINEL_TELEMETRY_BACKEND", "").strip().lower()
+DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL") or os.environ.get("POSTGRESQL_URL")
 ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "").rstrip("/")
 ELASTICSEARCH_USERNAME = os.environ.get("ELASTICSEARCH_USERNAME")
 ELASTICSEARCH_PASSWORD = os.environ.get("ELASTICSEARCH_PASSWORD")

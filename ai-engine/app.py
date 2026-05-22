@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 try:
+    from .ns_ai_attack_profile import attack_knowledge_base
     from .ns_ai_attack_dict import attack_dictionary_status, refresh_attack_dictionary
     from .ns_ai_config import (
         DNS_ANOMALY_THRESHOLD,
@@ -20,6 +21,7 @@ try:
     )
     from .ns_ai_detectors import run_detection_cycle
 except ImportError:
+    from ns_ai_attack_profile import attack_knowledge_base
     from ns_ai_attack_dict import attack_dictionary_status, refresh_attack_dictionary
     from ns_ai_config import (
         DNS_ANOMALY_THRESHOLD,
@@ -83,6 +85,11 @@ async def status():
 @app.post("/refresh-attack-dictionary")
 async def refresh_attack_dictionary_endpoint():
     return refresh_attack_dictionary(force=True)
+
+
+@app.get("/attack-knowledge-base")
+async def get_attack_knowledge_base():
+    return attack_knowledge_base()
 
 
 @app.post("/run-once")

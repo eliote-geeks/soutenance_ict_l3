@@ -308,8 +308,9 @@ Acces :
 
 Backend et AI engine utilisent notamment :
 
-- `NETSENTINEL_STORAGE_BACKEND` : `elastic`, `json` ou `demo`
+- `NETSENTINEL_STORAGE_BACKEND` : `elastic`, `json`, `postgresql` ou `demo`
 - `STORAGE_JSON_PATH` : chemin du fichier de stockage si `NETSENTINEL_STORAGE_BACKEND=json`
+- `DATABASE_URL` : DSN PostgreSQL si `NETSENTINEL_STORAGE_BACKEND=postgresql`
 - `NETSENTINEL_TELEMETRY_BACKEND` : `elastic`, `json` ou `demo`
 - `TELEMETRY_JSON_PATH` : chemin du fichier de telemetrie si `NETSENTINEL_TELEMETRY_BACKEND=json`
 - `ELASTICSEARCH_URL`
@@ -322,6 +323,7 @@ Le stockage applicatif du backend est maintenant configurable par environnement 
 
 - `elastic` : profils, assets, agents et findings sont stockes dans Elasticsearch ;
 - `json` : profils, assets, agents et findings sont stockes localement dans un fichier JSON ;
+- `postgresql` : profils, assets, agents et findings sont stockes dans PostgreSQL via `DATABASE_URL` ;
 - `demo` : lecture des donnees de demonstration, sans persistance.
 
 La telemetrie securite est aussi configurable par environnement :
@@ -330,7 +332,7 @@ La telemetrie securite est aussi configurable par environnement :
 - `json` : lit un fichier JSON contenant `logs`, `packet_events`, `metric_hosts`, `ai_alerts`, et optionnellement `traffic` ;
 - `demo` : laisse l'application retomber sur les jeux de donnees de demonstration.
 
-Pour PostgreSQL ou une autre base, l'interface est maintenant isolee dans `backend/ns_telemetry.py`.
+La telemetrie securite reste separee du stockage applicatif. PostgreSQL couvre le stockage applicatif ; pour remplacer les logs/flows Elastic, il faut brancher un backend de telemetrie dedie.
 
 AI engine :
 
@@ -342,7 +344,7 @@ Backend :
 
 Agent / admin :
 
-- secret admin pour les endpoints d'enrolement
+- `ADMIN_API_SECRET` : secret backend utilise pour ouvrir une session admin HTTP-only, ne pas l'exposer dans le build frontend
 - `AGENT_ELASTIC_API_KEY`
 - `ALLOW_AGENT_BASIC_AUTH`
 
@@ -377,6 +379,8 @@ Principes :
 - l'admin peut approuver, rejeter ou desactiver un agent depuis le dashboard.
 
 Documentation :
+
+- [TEST_MULTI_MACHINES_NETSENTINEL.md](/home/paul/Bureau/Projects/netsentinel-ai/docs/TEST_MULTI_MACHINES_NETSENTINEL.md)
 
 - [agent/README.md](/home/paul/Bureau/Projects/netsentinel-ai/agent/README.md)
 

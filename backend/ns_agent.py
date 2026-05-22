@@ -19,6 +19,12 @@ SUPPORTED_AGENT_ACTIONS = {
     "terminate_process_by_pid",
     "collect_triage",
 }
+DANGEROUS_AGENT_ACTIONS = {
+    "block_ip",
+    "unblock_ip",
+    "terminate_process_by_name",
+    "terminate_process_by_pid",
+}
 
 
 SIGNAL_INT_KEYS = {
@@ -167,10 +173,17 @@ def queue_agent_action(
     action_type: str,
     parameters: dict[str, Any] | None = None,
     reason: str | None = None,
+    confirmation: str | None = None,
 ) -> dict[str, Any]:
     normalized_type = normalize_text(action_type, "").strip().lower()
     if normalized_type not in SUPPORTED_AGENT_ACTIONS:
         raise ValueError(f"Unsupported agent action: {action_type}")
+    normalized_reason = normalize_text(reason, "").strip()
+    if normalized_type in DANGEROUS_AGENT_ACTIONS:
+        if confirmation != "CONFIRM_LOCAL_ACTION":
+            raise ValueError("Dangerous local actions require confirmation=CONFIRM_LOCAL_ACTION.")
+        if len(normalized_reason) < 12:
+            raise ValueError("Dangerous local actions require a clear reason with at least 12 characters.")
     safe_parameters = validate_action_parameters(normalized_type, parameters)
 
     pending = instance.setdefault("pending_actions", [])
@@ -178,7 +191,7 @@ def queue_agent_action(
         "id": f"action_{uuid.uuid4().hex[:12]}",
         "type": normalized_type,
         "parameters": safe_parameters,
-        "reason": normalize_text(reason, ""),
+        "reason": normalized_reason,
         "status": "pending",
         "created_at": iso(now_utc()),
         "expires_at": iso(now_utc() + timedelta(hours=6)),

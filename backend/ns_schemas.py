@@ -100,3 +100,8 @@ class AgentCommandCreateRequest(BaseModel):
     action_type: str
     parameters: dict[str, Any] | None = None
     reason: str | None = None
+    confirmation: str | None = None
+
+
+class AdminSessionRequest(BaseModel):
+    secret: str

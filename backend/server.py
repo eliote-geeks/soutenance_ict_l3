@@ -1,11 +1,14 @@
 import hashlib
+import hmac
 import ipaddress
+import os
+import secrets
 import uuid
 from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException
+from fastapi import APIRouter, FastAPI, Header, HTTPException, Request, Response
 from starlette.middleware.cors import CORSMiddleware
 
 try:
@@ -20,6 +23,7 @@ try:
     from .ns_analytics import (
         aggregate_packetbeat_traffic,
         ai_findings,
+        ai_attack_knowledge_base,
         ai_recommendations,
         ai_status,
         anomaly_score,
@@ -81,6 +85,7 @@ try:
         AgentEnrollRequest,
         AgentHeartbeatRequest,
         AgentInstanceActionRequest,
+        AdminSessionRequest,
         AssetCreateRequest,
         BlockIPRequest,
         ProfileAssetCreateRequest,
@@ -104,6 +109,7 @@ except ImportError:
     from ns_analytics import (
         aggregate_packetbeat_traffic,
         ai_findings,
+        ai_attack_knowledge_base,
         ai_recommendations,
         ai_status,
         anomaly_score,
@@ -165,6 +171,7 @@ except ImportError:
         AgentEnrollRequest,
         AgentHeartbeatRequest,
         AgentInstanceActionRequest,
+        AdminSessionRequest,
         AssetCreateRequest,
         BlockIPRequest,
         ProfileAssetCreateRequest,
@@ -180,6 +187,8 @@ except ImportError:
 
 app = FastAPI(title="NetSentinel AI API", version="0.1.0")
 api_router = APIRouter(prefix="/api")
+ADMIN_SESSION_COOKIE = "netsentinel_admin_session"
+ADMIN_SESSION_TTL_SECONDS = int(os.environ.get("ADMIN_SESSION_TTL_SECONDS", "28800"))
 
 
 def elastic_index_doc(index: str, doc_id: str, payload: dict[str, Any]) -> bool:
@@ -199,9 +208,58 @@ def hash_agent_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
 
 
-def assert_admin_secret(provided_secret: str | None) -> None:
-    if not provided_secret or provided_secret != ADMIN_API_SECRET:
+def _sign_admin_session(payload: str) -> str:
+    return hmac.new(ADMIN_API_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def create_admin_session_token() -> str:
+    nonce = secrets.token_urlsafe(32)
+    issued_at = str(int(now_utc().timestamp()))
+    payload = f"{issued_at}.{nonce}"
+    return f"{payload}.{_sign_admin_session(payload)}"
+
+
+def valid_admin_session_token(token: str | None) -> bool:
+    if not token or token.count(".") != 2:
+        return False
+    issued_at_raw, nonce, signature = token.split(".", 2)
+    payload = f"{issued_at_raw}.{nonce}"
+    expected = _sign_admin_session(payload)
+    if not hmac.compare_digest(signature, expected):
+        return False
+    try:
+        issued_at = int(issued_at_raw)
+    except ValueError:
+        return False
+    return int(now_utc().timestamp()) - issued_at <= ADMIN_SESSION_TTL_SECONDS
+
+
+def assert_admin_secret(provided_secret: str | None, request: Request | None = None) -> None:
+    if provided_secret and hmac.compare_digest(provided_secret, ADMIN_API_SECRET):
+        return
+    cookie_token = request.cookies.get(ADMIN_SESSION_COOKIE) if request else None
+    if not valid_admin_session_token(cookie_token):
         raise HTTPException(status_code=401, detail="Invalid admin secret.")
+
+
+@api_router.post("/admin/session")
+async def create_admin_session(request: AdminSessionRequest, response: Response):
+    assert_admin_secret(request.secret)
+    response.set_cookie(
+        ADMIN_SESSION_COOKIE,
+        create_admin_session_token(),
+        max_age=ADMIN_SESSION_TTL_SECONDS,
+        httponly=True,
+        secure=os.environ.get("ADMIN_SESSION_COOKIE_SECURE", "false").lower() == "true",
+        samesite=os.environ.get("ADMIN_SESSION_COOKIE_SAMESITE", "lax"),
+    )
+    return {"success": True}
+
+
+@api_router.delete("/admin/session")
+async def delete_admin_session(response: Response):
+    response.delete_cookie(ADMIN_SESSION_COOKIE)
+    return {"success": True}
 
 
 def token_expired(document: dict[str, Any]) -> bool:
@@ -572,9 +630,9 @@ async def assign_profile_asset(request: ProfileAssetCreateRequest):
 
 
 @api_router.post("/agent/enrollment-tokens")
-async def create_agent_enrollment_token(request: AgentEnrollmentTokenCreateRequest, x_admin_secret: str | None = Header(default=None)):
+async def create_agent_enrollment_token(request: AgentEnrollmentTokenCreateRequest, http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     token_id = f"token_{uuid.uuid4().hex[:12]}"
     raw_token = f"nst_{uuid.uuid4().hex}{uuid.uuid4().hex[:8]}"
     document = {
@@ -595,16 +653,16 @@ async def create_agent_enrollment_token(request: AgentEnrollmentTokenCreateReque
 
 
 @api_router.get("/agent/enrollment-tokens")
-async def list_agent_enrollment_tokens(x_admin_secret: str | None = Header(default=None)):
+async def list_agent_enrollment_tokens(http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     return {"tokens": [{**token, "expired": token_expired(token)} for token in fetch_agent_enrollment_tokens()]}
 
 
 @api_router.post("/agent/enrollment-tokens/{token_id}/revoke")
-async def revoke_agent_enrollment_token(token_id: str, x_admin_secret: str | None = Header(default=None)):
+async def revoke_agent_enrollment_token(token_id: str, http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     token = next((item for item in fetch_agent_enrollment_tokens() if item.get("id") == token_id), None)
     if not token:
         raise HTTPException(status_code=404, detail="Enrollment token not found.")
@@ -615,9 +673,9 @@ async def revoke_agent_enrollment_token(token_id: str, x_admin_secret: str | Non
 
 
 @api_router.get("/agent/instances")
-async def list_agent_instances(x_admin_secret: str | None = Header(default=None)):
+async def list_agent_instances(http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     assets_lookup = {item.get("id"): item for item in fetch_assets_metadata()}
     instances = []
     for instance in fetch_agent_instances():
@@ -682,9 +740,9 @@ async def enroll_agent(request: AgentEnrollRequest):
 
 
 @api_router.post("/agent/instances/{instance_id}/approve")
-async def approve_agent_instance(instance_id: str, x_admin_secret: str | None = Header(default=None)):
+async def approve_agent_instance(instance_id: str, http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     instance = find_agent_instance(instance_id)
     if not instance:
         raise HTTPException(status_code=404, detail="Agent instance not found.")
@@ -710,9 +768,9 @@ async def approve_agent_instance(instance_id: str, x_admin_secret: str | None = 
 
 
 @api_router.post("/agent/instances/{instance_id}/reject")
-async def reject_agent_instance(instance_id: str, request: AgentInstanceActionRequest, x_admin_secret: str | None = Header(default=None)):
+async def reject_agent_instance(instance_id: str, request: AgentInstanceActionRequest, http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     instance = find_agent_instance(instance_id)
     if not instance:
         raise HTTPException(status_code=404, detail="Agent instance not found.")
@@ -725,9 +783,9 @@ async def reject_agent_instance(instance_id: str, request: AgentInstanceActionRe
 
 
 @api_router.post("/agent/instances/{instance_id}/disable")
-async def disable_agent_instance(instance_id: str, request: AgentInstanceActionRequest, x_admin_secret: str | None = Header(default=None)):
+async def disable_agent_instance(instance_id: str, request: AgentInstanceActionRequest, http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     instance = find_agent_instance(instance_id)
     if not instance:
         raise HTTPException(status_code=404, detail="Agent instance not found.")
@@ -741,9 +799,9 @@ async def disable_agent_instance(instance_id: str, request: AgentInstanceActionR
 
 
 @api_router.post("/agent/instances/{instance_id}/actions")
-async def queue_agent_instance_action(instance_id: str, request: AgentCommandCreateRequest, x_admin_secret: str | None = Header(default=None)):
+async def queue_agent_instance_action(instance_id: str, request: AgentCommandCreateRequest, http_request: Request, x_admin_secret: str | None = Header(default=None)):
     require_agent_storage()
-    assert_admin_secret(x_admin_secret)
+    assert_admin_secret(x_admin_secret, http_request)
     instance = find_agent_instance(instance_id)
     if not instance:
         raise HTTPException(status_code=404, detail="Agent instance not found.")
@@ -755,6 +813,7 @@ async def queue_agent_instance_action(instance_id: str, request: AgentCommandCre
             action_type=request.action_type,
             parameters=request.parameters,
             reason=request.reason,
+            confirmation=request.confirmation,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -955,6 +1014,11 @@ async def ai_engine_findings():
 @api_router.get("/ai/recommendations")
 async def ai_engine_recommendations():
     return {"items": ai_recommendations()}
+
+
+@api_router.get("/ai/attack-knowledge-base")
+async def ai_engine_attack_knowledge_base():
+    return ai_attack_knowledge_base()
 
 
 @api_router.post("/ai/findings")

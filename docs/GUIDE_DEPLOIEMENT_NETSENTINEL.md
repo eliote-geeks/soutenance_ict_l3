@@ -214,8 +214,9 @@ Acces :
 
 ### Backend
 
-- `NETSENTINEL_STORAGE_BACKEND` (`elastic`, `json` ou `demo`)
+- `NETSENTINEL_STORAGE_BACKEND` (`elastic`, `json`, `postgresql` ou `demo`)
 - `STORAGE_JSON_PATH` si `NETSENTINEL_STORAGE_BACKEND=json`
+- `DATABASE_URL` si `NETSENTINEL_STORAGE_BACKEND=postgresql`
 - `NETSENTINEL_TELEMETRY_BACKEND` (`elastic`, `json` ou `demo`)
 - `TELEMETRY_JSON_PATH` si `NETSENTINEL_TELEMETRY_BACKEND=json`
 - `ELASTICSEARCH_URL`

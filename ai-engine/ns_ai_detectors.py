@@ -4,6 +4,7 @@ from sklearn.ensemble import IsolationForest, RandomForestClassifier
 
 try:
     from .ns_ai_attack_dict import attack_dictionary_status
+    from .ns_ai_attack_profile import row_training_label
     from .ns_ai_clients import backend_post
     from .ns_ai_config import (
         DNS_ANOMALY_THRESHOLD,
@@ -35,6 +36,7 @@ try:
     from .ns_ai_state import dedup_signature, load_state, mark_published, prune_state, save_state, should_publish
 except ImportError:
     from ns_ai_attack_dict import attack_dictionary_status
+    from ns_ai_attack_profile import row_training_label
     from ns_ai_clients import backend_post
     from ns_ai_config import (
         DNS_ANOMALY_THRESHOLD,
@@ -118,12 +120,7 @@ def detect_random_forest_anomalies(current_rows: list[dict[str, Any]], history_r
 
     labels = []
     for row in history_rows:
-        suspicious = (
-            int(row["failed_logins"]) >= SSH_FAILURE_THRESHOLD
-            or int(row["dns_errors"]) >= DNS_ANOMALY_THRESHOLD
-            or int(row["distinct_ports"]) >= PORT_SCAN_DISTINCT_PORT_THRESHOLD
-        )
-        labels.append(1 if suspicious else 0)
+        labels.append(row_training_label(row))
 
     if labels.count(1) < RF_MIN_POSITIVE_SAMPLES or labels.count(0) < RF_MIN_POSITIVE_SAMPLES:
         return []

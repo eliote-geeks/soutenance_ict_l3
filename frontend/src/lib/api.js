@@ -21,7 +21,6 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8010';
 const API_BASE = `${BACKEND_URL}/api`;
 const SCOPE_STORAGE_KEY = 'netsentinel-scope';
-const ADMIN_SECRET = process.env.REACT_APP_ADMIN_SECRET || 'netsentinel-admin-dev-secret';
 
 // Simulate network delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -63,11 +62,11 @@ const fetchJson = async (path, options) => {
 const fetchAdminJson = async (path, options = {}) => {
   const headers = {
     ...(options.headers || {}),
-    'x-admin-secret': ADMIN_SECRET,
   };
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
   if (!response.ok) {
     let detail = `API request failed with status ${response.status}`;
@@ -77,7 +76,22 @@ const fetchAdminJson = async (path, options = {}) => {
     } catch (error) {
       // keep default detail
     }
-    throw new Error(detail);
+    const error = new Error(detail);
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+};
+
+export const authenticateAdminSession = async (secret) => {
+  const response = await fetch(`${API_BASE}/admin/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ secret }),
+  });
+  if (!response.ok) {
+    throw new Error(`Admin authentication failed with status ${response.status}`);
   }
   return response.json();
 };

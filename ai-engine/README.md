@@ -8,6 +8,7 @@ Fonctions:
 - combiner heuristiques + `IsolationForest` + `RandomForest`
 - attacher des references `MITRE ATT&CK` aux findings
 - publier les findings vers le backend NetSentinel via `/api/ai/findings`
+- exposer une base d'apprentissage attaque via `/attack-knowledge-base`
 
 Lancement:
 
@@ -27,4 +28,10 @@ Refresh explicite du dictionnaire MITRE officiel:
 ```bash
 cd /home/paul/Bureau/Projects/netsentinel-ai/ai-engine
 PYTHONPATH=. ../.venv/bin/python refresh_attack_dictionary.py
+```
+
+Base attaque utilisee par les heuristiques et les labels d'apprentissage:
+
+```bash
+curl http://127.0.0.1:9000/attack-knowledge-base
 ```

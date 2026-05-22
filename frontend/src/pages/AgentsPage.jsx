@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/context/AuthContext';
 import {
+  authenticateAdminSession,
   approveAgentInstance,
   createEnrollmentToken,
   disableAgentInstance,
@@ -92,17 +93,37 @@ export default function AgentsPage() {
   const [tokens, setTokens] = useState([]);
   const [form, setForm] = useState(initialForm);
 
+  const ensureAdminSession = async () => {
+    const secret = window.prompt('Backend admin secret');
+    if (!secret) {
+      throw new Error('Admin session required.');
+    }
+    await authenticateAdminSession(secret);
+  };
+
+  const runAdminRequest = async (runner) => {
+    try {
+      return await runner();
+    } catch (error) {
+      if (error.status !== 401) {
+        throw error;
+      }
+      await ensureAdminSession();
+      return runner();
+    }
+  };
+
   const loadData = async () => {
     if (!isAdmin) {
       setLoading(false);
       return;
     }
     try {
-      const [assetsResult, instancesResult, tokensResult] = await Promise.all([
-        fetchAssets(),
-        fetchAgentInstances(),
-        fetchEnrollmentTokens(),
-      ]);
+      const [assetsResult, instancesResult, tokensResult] = await runAdminRequest(() => Promise.all([
+          fetchAssets(),
+          fetchAgentInstances(),
+          fetchEnrollmentTokens(),
+        ]));
       setAssets(assetsResult.assets || []);
       setInstances(instancesResult.instances || []);
       setTokens(tokensResult.tokens || []);
@@ -155,7 +176,7 @@ export default function AgentsPage() {
         single_use: form.single_use === 'true',
         profile_id: form.profile_id || null,
       };
-      const result = await createEnrollmentToken(payload);
+      const result = await runAdminRequest(() => createEnrollmentToken(payload));
       setLatestToken(result.token);
       setOpen(false);
       toast.success('Enrollment token created.', {
@@ -174,7 +195,7 @@ export default function AgentsPage() {
 
   const handleAction = async (runner, successMessage) => {
     try {
-      await runner();
+      await runAdminRequest(runner);
       toast.success(successMessage);
       await loadData();
     } catch (error) {

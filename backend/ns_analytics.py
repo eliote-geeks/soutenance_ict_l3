@@ -3,7 +3,10 @@ from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
+import requests
+
 try:
+    from .ns_elastic import ai_service_configured
     from .ns_config import (
         AI_ALERTS_INDEX,
         START_TIME,
@@ -17,6 +20,7 @@ try:
         severity_weight,
     )
 except ImportError:
+    from ns_elastic import ai_service_configured
     from ns_config import (
         AI_ALERTS_INDEX,
         START_TIME,
@@ -29,7 +33,6 @@ except ImportError:
         percent_change,
         severity_weight,
     )
-    from ns_elastic import ai_service_configured
 
 try:
     from .ns_demo_data import AI_FINDINGS_BUFFER, ALERTS, BLOCKED_IPS, HOSTS
@@ -445,6 +448,28 @@ def ai_recommendations() -> list[dict]:
         {"pattern": "Horizontal port scan observed", "recommendation": "Block the scanner at the firewall and reduce externally exposed ports.", "commands": ["sudo ufw deny from <source-ip>", "sudo ss -tulpn", "sudo nmap -sV <host>"]},
         {"pattern": "Abnormal outbound DNS burst", "recommendation": "Investigate the process generating DNS traffic and isolate the endpoint if persistence is observed.", "commands": ["sudo lsof -i :53", "sudo tcpdump -ni any port 53 -c 50", "sudo netstat -plant"]},
     ]
+
+
+def ai_attack_knowledge_base() -> dict:
+    if ai_service_configured():
+        runtime = fetch_ai_runtime_status()
+        service_url = runtime.get("serviceUrl")
+        if service_url:
+            try:
+                response = requests.get(f"{service_url}/attack-knowledge-base", timeout=8)
+                response.raise_for_status()
+                return response.json()
+            except requests.RequestException:
+                pass
+    return {
+        "dictionary": {"source": "MITRE ATT&CK Enterprise", "mode": "backend-fallback"},
+        "profileCount": 3,
+        "profiles": [
+            {"id": "ssh_bruteforce", "name": "SSH brute force", "tactic": "Credential Access", "techniques": [{"id": "T1110", "name": "Brute Force"}]},
+            {"id": "dns_c2_anomaly", "name": "DNS command-and-control anomaly", "tactic": "Command and Control", "techniques": [{"id": "T1071.004", "name": "DNS"}]},
+            {"id": "port_scan", "name": "Network service discovery / port scan", "tactic": "Discovery", "techniques": [{"id": "T1046", "name": "Network Service Discovery"}]},
+        ],
+    }
 
 
 def predictions_data() -> dict:
