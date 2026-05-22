@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BadgeCheck,
   Bot,
@@ -92,13 +92,22 @@ export default function AgentsPage() {
   const [instances, setInstances] = useState([]);
   const [tokens, setTokens] = useState([]);
   const [form, setForm] = useState(initialForm);
+  const [adminAuthOpen, setAdminAuthOpen] = useState(false);
+  const [adminSecret, setAdminSecret] = useState('');
+  const [adminAuthError, setAdminAuthError] = useState('');
+  const [adminAuthSubmitting, setAdminAuthSubmitting] = useState(false);
+  const adminAuthResolver = useRef(null);
 
   const ensureAdminSession = async () => {
-    const secret = window.prompt('Backend admin secret');
-    if (!secret) {
-      throw new Error('Admin session required.');
+    if (adminAuthResolver.current) {
+      throw new Error('Admin authentication is already in progress.');
     }
-    await authenticateAdminSession(secret);
+    setAdminSecret('');
+    setAdminAuthError('');
+    setAdminAuthOpen(true);
+    return new Promise((resolve, reject) => {
+      adminAuthResolver.current = { resolve, reject };
+    });
   };
 
   const runAdminRequest = async (runner) => {
@@ -205,31 +214,106 @@ export default function AgentsPage() {
     }
   };
 
+  const handleAdminAuthCancel = () => {
+    adminAuthResolver.current?.reject(new Error('Admin session required.'));
+    adminAuthResolver.current = null;
+    setAdminAuthOpen(false);
+    setAdminAuthSubmitting(false);
+    setAdminAuthError('');
+    setAdminSecret('');
+  };
+
+  const handleAdminAuthSubmit = async (event) => {
+    event.preventDefault();
+    setAdminAuthSubmitting(true);
+    setAdminAuthError('');
+    try {
+      await authenticateAdminSession(adminSecret);
+      adminAuthResolver.current?.resolve();
+      adminAuthResolver.current = null;
+      setAdminAuthOpen(false);
+      setAdminSecret('');
+      toast.success('Admin session opened.');
+    } catch (error) {
+      setAdminAuthError('Secret admin invalide ou backend indisponible.');
+    } finally {
+      setAdminAuthSubmitting(false);
+    }
+  };
+
+  const adminAuthDialog = (
+    <Dialog open={adminAuthOpen} onOpenChange={(value) => {
+      if (!value) {
+        handleAdminAuthCancel();
+      }
+    }}>
+      <DialogContent className="border-primary/20 bg-card/95 shadow-glow backdrop-blur-xl sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Session administrateur backend</DialogTitle>
+          <DialogDescription>
+            Entre le secret backend pour créer des tokens, approuver les agents et gérer les actions sensibles.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={handleAdminAuthSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="admin-secret">Backend admin secret</Label>
+            <Input
+              id="admin-secret"
+              type="password"
+              autoFocus
+              value={adminSecret}
+              onChange={(event) => setAdminSecret(event.target.value)}
+              placeholder="Secret admin backend"
+            />
+            {adminAuthError && (
+              <p className="text-sm text-destructive">{adminAuthError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleAdminAuthCancel}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={adminAuthSubmitting || !adminSecret.trim()}>
+              {adminAuthSubmitting ? 'Vérification...' : 'Ouvrir la session'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!isAdmin) {
     return (
-      <EmptyState
-        icon={ShieldX}
-        title="Agent administration is restricted"
-        description="Only administrators can create enrollment tokens, approve machines, and disable deployed agents."
-      />
+      <>
+        {adminAuthDialog}
+        <EmptyState
+          icon={ShieldX}
+          title="Agent administration is restricted"
+          description="Only administrators can create enrollment tokens, approve machines, and disable deployed agents."
+        />
+      </>
     );
   }
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <LoadingSkeleton key={index} variant="card" />
-          ))}
+      <>
+        {adminAuthDialog}
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <LoadingSkeleton key={index} variant="card" />
+            ))}
+          </div>
+          <LoadingSkeleton variant="table" />
         </div>
-        <LoadingSkeleton variant="table" />
-      </div>
+      </>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {adminAuthDialog}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Agent Administration</h1>
