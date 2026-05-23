@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Server, Search, Shield, AlertTriangle, Wifi, WifiOff, Download, Plus } from 'lucide-react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -474,6 +475,22 @@ export default function HostsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <PageHelp
+        title="Assets / Hosts"
+        description="Inventory of all monitored machines. Risk scores are computed from open CVEs, alert frequency and network exposure."
+        items={[
+          { label: 'Browse assets', desc: 'The table lists every host seen by Elasticsearch. Click a row to open a detail drawer with full context.' },
+          { label: 'Filter by status', desc: 'Use the status filter buttons (Online / Offline / High-risk) to narrow down the list.' },
+          { label: 'Risk score', desc: 'A score from 0–100 aggregating CVE severity, recent alert count and OS patch level.' },
+          { label: 'Export', desc: 'Download the full asset inventory as CSV using the Export button.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'Sort by Risk Score descending to prioritise remediation on the most exposed hosts.' },
+          { type: 'info', text: 'Hosts appear automatically once an agent is active and sending heartbeats — no manual registration needed.' },
+          { type: 'warning', text: 'Offline hosts still appear in the list. Investigate long-offline hosts — the agent may have been tampered with.' },
+        ]}
+      />
     </div>
   );
 }

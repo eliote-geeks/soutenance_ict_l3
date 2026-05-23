@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { 
-  AlertTriangle, 
-  Clock, 
+import { PageHelp } from '@/components/shared/PageHelp';
+import {
+  AlertTriangle,
+  Clock,
   Target,
   Layers3,
   Radar
@@ -288,6 +289,22 @@ export default function IncidentsPage() {
           </div>
         )}
       </div>
+
+      <PageHelp
+        title="Incidents"
+        description="Incidents group related alerts into a single investigation case. Track status, assign severity and review the full timeline."
+        items={[
+          { label: 'View incident list', desc: 'Each incident card shows severity, affected assets, and current status (Open / In Progress / Resolved).' },
+          { label: 'Open an incident', desc: 'Click a card to see the full timeline of correlated alerts that triggered the incident.' },
+          { label: 'Update status', desc: 'Change the incident status as your investigation progresses — keep the queue current for the whole team.' },
+          { label: 'MITRE mapping', desc: 'Each incident is tagged with the ATT&CK tactic chain to map the attack kill chain.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'Incidents are automatically created when multiple correlated alerts fire within a short time window.' },
+          { type: 'info', text: 'Resolving an incident does not close the underlying alerts — manage alert status separately on the Alerts page.' },
+          { type: 'warning', text: 'High-severity incidents with no status update after 1 hour will re-trigger a Critical alert.' },
+        ]}
+      />
     </div>
   );
 }

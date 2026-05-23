@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Activity, Shield, Clock, Globe, Server, TrendingUp } from 'lucide-react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KPICard } from '@/components/shared/KPICard';
 import { AnomalyGauge } from '@/components/shared/AnomalyGauge';
@@ -281,6 +282,22 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      <PageHelp
+        title="SOC Overview"
+        description="Real-time security dashboard showing KPIs, anomaly scores and active threat indicators from your Elasticsearch cluster."
+        items={[
+          { label: 'KPI Cards', desc: 'Active alerts, critical hosts, events/sec and detection rate — all pulled live from Elasticsearch.' },
+          { label: 'Anomaly Gauge', desc: 'Composite score (0–100) from the One-Class SVM model. Above 70 indicates active threat activity.' },
+          { label: 'Alert Severity Chart', desc: 'Distribution of Critical / High / Medium alerts over the selected time window.' },
+          { label: 'Top Threat IPs', desc: 'Source IPs with the highest alert count. Blocked = firewall rule is active.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'Use the scope selector in the top bar to filter all panels to a specific host or asset profile.' },
+          { type: 'info', text: 'Data refreshes every 30 seconds automatically. The "LIVE" indicator in the top bar confirms connectivity.' },
+          { type: 'warning', text: 'An anomaly score above 80 warrants immediate investigation — check the Alerts page for details.' },
+        ]}
+      />
     </div>
   );
 }

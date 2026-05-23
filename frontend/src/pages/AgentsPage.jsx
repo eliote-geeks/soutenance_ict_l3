@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import {
   BadgeCheck,
   Bot,
@@ -721,6 +722,22 @@ export default function AgentsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PageHelp
+        title="Agents"
+        description="Manage lightweight monitoring agents deployed on your assets. Agents collect logs, metrics and packet data and ship them to Elasticsearch."
+        items={[
+          { label: 'Create enrollment token', desc: 'Generate a token in the Enrollment Tokens section — each token is used once to register a new agent.' },
+          { label: 'Run install script', desc: 'Copy the one-liner from the Enroll Agent panel and run it as root on the target machine.' },
+          { label: 'Approve the agent', desc: 'A new agent appears in "pending_approval" state. Click Approve to activate it.' },
+          { label: 'Monitor status', desc: 'Once active, the agent sends heartbeats every 5 minutes. Status turns "active" when the first heartbeat arrives.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'Tokens expire quickly. Use a 24-hour, non-single-use token for multi-step installs or slow network environments.' },
+          { type: 'info', text: 'The agent installs Filebeat, Metricbeat and Packetbeat automatically — no manual Beat configuration needed.' },
+          { type: 'warning', text: 'Approval requires admin credentials (the Admin Secret set in backend/.env). Keep this secret secure.' },
+        ]}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileSearch, Search, Calendar, Download, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -335,6 +336,22 @@ export default function LogsExplorerPage() {
           </ScrollArea>
         </CardContent>
       </Card>
+
+      <PageHelp
+        title="Elastic Logs"
+        description="Full-text log search powered by Elasticsearch. Supports KQL (Kibana Query Language) for precise filtering."
+        items={[
+          { label: 'Search with KQL', desc: 'Type a KQL query in the search bar. Example: severity:critical AND source.ip:10.0.0.1' },
+          { label: 'Select time range', desc: 'Use the time picker to restrict results to a specific period (Last 1h, 24h, 7d, or custom).' },
+          { label: 'Expand a log entry', desc: 'Click the arrow on any row to expand the full structured log with all fields.' },
+          { label: 'Export results', desc: 'Download the current query results as a CSV or JSON file using the Export button.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'Use field:value syntax for exact matching. Example: agent.type:filebeat AND event.category:network' },
+          { type: 'info', text: 'KQL is case-insensitive and supports wildcards: host.name:web-* matches web-01, web-02, etc.' },
+          { type: 'warning', text: 'Very broad queries (no time range, no field filters) may be slow on large clusters — always add a time constraint.' },
+        ]}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   FileText,
   Shield,
   Bot,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ const navItems = [
   { path: '/model',     icon: Brain,           label: 'AI Detection',    badge: false },
   { path: '/pipeline',  icon: Activity,        label: 'Stack Health',    badge: false },
   { path: '/reports',   icon: FileText,        label: 'Reports',         badge: false },
+  { path: '/guide',     icon: BookOpen,        label: 'User Guide',      badge: false },
 ];
 
 export const Sidebar = ({ collapsed, onToggle }) => {

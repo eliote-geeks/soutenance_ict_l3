@@ -18,6 +18,7 @@ import AgentsPage        from '@/pages/AgentsPage';
 import ModelPage         from '@/pages/ModelPage';
 import PipelinePage      from '@/pages/PipelinePage';
 import ReportsPage       from '@/pages/ReportsPage';
+import UserGuidePage     from '@/pages/UserGuidePage';
 
 // ─── Auth pages ─────────────────────────────────────────────────────────────
 import LoginPage         from '@/pages/auth/LoginPage';
@@ -57,6 +58,7 @@ function App() {
                 <Route path="/model"     element={<ModelPage />} />
                 <Route path="/pipeline"  element={<PipelinePage />} />
                 <Route path="/reports"   element={<ReportsPage />} />
+                <Route path="/guide"     element={<UserGuidePage />} />
 
                 {/* Redirect old routes to home instead of 404 */}
                 <Route path="/network"     element={<Navigate to="/" replace />} />

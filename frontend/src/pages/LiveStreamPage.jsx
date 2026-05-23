@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RefreshCw, Zap, Clock, Activity } from 'lucide-react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -304,6 +305,22 @@ export default function LiveStreamPage() {
           </span>
         </div>
       </div>
+
+      <PageHelp
+        title="Telemetry Stream"
+        description="Live feed of raw security events arriving from all monitored hosts via Filebeat, Metricbeat and Packetbeat."
+        items={[
+          { label: 'Watch the stream', desc: 'Events scroll in real-time as they arrive from Elasticsearch. Each row is one raw log event.' },
+          { label: 'Pause / Resume', desc: 'Hit the Pause button to freeze the stream and inspect individual events without them scrolling away.' },
+          { label: 'Filter by type', desc: 'Use the type filter (network, file, process, auth…) to narrow the stream to events you care about.' },
+          { label: 'Expand event', desc: 'Click any event row to expand the full JSON payload for deep inspection.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'Pause the stream before trying to read a specific event — new events push older ones off-screen quickly.' },
+          { type: 'info', text: 'The counter at the bottom-right shows how many events arrived in the last 5 seconds — a useful health indicator.' },
+          { type: 'warning', text: 'High event rates (>200/s) may indicate a scan or flood attack — check the Alerts page immediately.' },
+        ]}
+      />
     </div>
   );
 }

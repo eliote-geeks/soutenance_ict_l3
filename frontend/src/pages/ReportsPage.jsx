@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FileText, Download, Calendar, Clock } from 'lucide-react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -332,6 +333,22 @@ export default function ReportsPage() {
           )}
         </CardContent>
       </Card>
+
+      <PageHelp
+        title="Reports"
+        description="Generate and download security reports from live data. Choose report type, date range and format, then export."
+        items={[
+          { label: 'Choose report type', desc: 'Select from Executive Summary, Technical Report, Compliance, Incident or Threat Intelligence report.' },
+          { label: 'Set date range', desc: 'Pick Last 24h, 7 days, 30 days, 90 days, or a custom range for the data to include.' },
+          { label: 'Export', desc: 'Click "Export Report" to generate and download the file immediately. The report appears in the session list below.' },
+          { label: 'Re-download', desc: 'Reports generated during the current session are listed at the bottom. Click the download icon to get them again.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'The Executive Summary is ideal for non-technical stakeholders — it focuses on KPIs and risk posture without raw data.' },
+          { type: 'info', text: 'Reports are generated from live Elasticsearch data at the moment you click Export — they reflect the current state.' },
+          { type: 'warning', text: 'Session reports are lost when you refresh the page. Save important reports to disk immediately after generation.' },
+        ]}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Activity, Server, AlertTriangle, CheckCircle, Clock, Gauge } from 'lucide-react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -244,6 +245,22 @@ export default function PipelinePage() {
           </div>
         </CardContent>
       </Card>
+
+      <PageHelp
+        title="Stack Health"
+        description="Real-time health monitoring for all components of the NetSentinel stack: Elasticsearch, Kibana, and all Beats agents."
+        items={[
+          { label: 'Component status', desc: 'Green = healthy, Yellow = degraded, Red = down. Each card shows latency and last successful check.' },
+          { label: 'Elasticsearch cluster', desc: 'Shows cluster health (green/yellow/red), node count, index sizes and ingestion rate.' },
+          { label: 'Beats agents', desc: 'Per-agent status for Filebeat, Metricbeat and Packetbeat — event counts and last heartbeat timestamp.' },
+          { label: 'Pipeline stages', desc: 'Visual flow from data collection through Elasticsearch ingest pipelines to the detection engine.' },
+        ]}
+        tips={[
+          { type: 'tip', text: 'A yellow Elasticsearch cluster means at least one replica shard is unassigned — usually not critical for a single-node setup.' },
+          { type: 'info', text: 'If a Beat agent shows "No data", check that the agent is approved on the Agents page and the service is running.' },
+          { type: 'warning', text: 'Red status on Elasticsearch means alerts and logs will stop flowing. Check network connectivity and disk space first.' },
+        ]}
+      />
     </div>
   );
 }

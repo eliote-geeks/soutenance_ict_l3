@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Brain, TrendingUp, AlertTriangle, CheckCircle, ShieldAlert, Gauge, Layers3 } from 'lucide-react';
+import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -413,6 +414,22 @@ export default function ModelPage() {
           </CardContent>
         </Card>
       </div>
+
+      <PageHelp
+        title="AI Detection"
+        description="Anomaly detection powered by a One-Class SVM trained on normal network behaviour. Deviations from the baseline trigger alerts."
+        items={[
+          { label: 'Model metrics', desc: 'Shows current model version, training date, accuracy and the number of samples used for training.' },
+          { label: 'Anomaly score', desc: 'A real-time score computed for each incoming event batch. Above 70 = anomalous; above 85 = high confidence threat.' },
+          { label: 'Feature importance', desc: 'Bar chart showing which network features (packet size, entropy, port distribution…) contribute most to detections.' },
+          { label: 'Detection history', desc: 'Timeline of anomaly score over the last 24h — look for spikes that correlate with alert bursts.' },
+        ]}
+        tips={[
+          { type: 'info', text: 'The One-Class SVM is trained only on normal traffic samples — it does not require labelled attack data.' },
+          { type: 'tip', text: 'A sudden drop in the anomaly score after a spike may indicate the attacker switched to slower, evasive techniques.' },
+          { type: 'warning', text: 'Model accuracy degrades if the network profile changes significantly (e.g. new application deployed). Retrain periodically.' },
+        ]}
+      />
     </div>
   );
 }
