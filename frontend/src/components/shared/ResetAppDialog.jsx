@@ -36,11 +36,13 @@ function Modal({ children, onClose }) {
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={e => { e.stopPropagation(); onClose(); }}
       />
-      {/* Panel */}
-      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in"
+      {/* Panel — stopPropagation prevents clicks bubbling through React portal tree */}
+      <div
+        className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in"
         style={{ zIndex: 100000 }}
+        onClick={e => e.stopPropagation()}
       >
         {children}
       </div>
