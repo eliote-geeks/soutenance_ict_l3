@@ -246,7 +246,7 @@ packetbeat.protocols:
   - type: dns
     ports: [53]
   - type: http
-    ports: [80, 8080, 8000, 443]
+    ports: [80, 8080, 8000]
   - type: tls
     ports: [443, 8443]
   - type: mysql
@@ -395,7 +395,7 @@ fields = {
     "RUNTIME_HEARTBEAT_INTERVAL_SECONDS": runtime.get("heartbeat_interval_seconds", 300),
 }
 for key, value in fields.items():
-    print(f"{key}={shlex.quote(str(value or ''))}")
+    print(f"{key}={shlex.quote(str(value or ""))}")
 ' "$response")"
 }
 

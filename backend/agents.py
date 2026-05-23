@@ -11,6 +11,9 @@ from .config import (
     ASSETS_INDEX,
     PROFILE_ASSETS_INDEX,
     ELASTICSEARCH_URL,
+    ELASTICSEARCH_USERNAME,
+    ELASTICSEARCH_PASSWORD,
+    ELASTICSEARCH_API_KEY,
     NETSENTINEL_API_URL,
 )
 from .data import DEFAULT_ASSETS, DEFAULT_PROFILE_ASSETS
@@ -65,8 +68,9 @@ def fetch_agent_instances() -> list[dict[str, Any]]:
     return instances
 
 
-def find_agent_enrollment_token(token_id: str) -> dict[str, Any] | None:
-    return next((token for token in fetch_agent_enrollment_tokens() if token.get("token_id") == token_id), None)
+def find_agent_enrollment_token(raw_token: str) -> dict[str, Any] | None:
+    token_hash = hash_agent_token(raw_token)
+    return next((token for token in fetch_agent_enrollment_tokens() if token.get("token_hash") == token_hash), None)
 
 
 def find_agent_instance(instance_id: str) -> dict[str, Any] | None:
@@ -123,12 +127,29 @@ def build_agent_activation(instance: dict[str, Any]) -> dict[str, Any]:
     profile_id = instance.get("profile_id")
     selected_asset = next((item for item in fetch_assets_metadata() if item.get("id") == asset_id), None)
     selected_profile = next((item for item in fetch_profile_asset_links() if item.get("profile_id") == profile_id), None)
+    elastic_payload: dict[str, Any] = {"url": ELASTICSEARCH_URL or ""}
+    if ELASTICSEARCH_API_KEY:
+        elastic_payload["api_key"] = ELASTICSEARCH_API_KEY
+    elif ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD:
+        elastic_payload["username"] = ELASTICSEARCH_USERNAME
+        elastic_payload["password"] = ELASTICSEARCH_PASSWORD
+    runtime_config = instance.get("runtime") or {}
     return {
         "instance_id": instance.get("id"),
         "asset_id": asset_id,
         "profile_id": profile_id,
         "assigned_at": datetime.now(timezone.utc).isoformat() + "Z",
-        "asset": selected_asset or {"id": asset_id},
+        "asset": {
+            **(selected_asset or {"id": asset_id}),
+            "site": instance.get("site"),
+            "role": instance.get("role"),
+            "environment": instance.get("environment"),
+            "profile_id": profile_id,
+        },
         "profile": selected_profile or {"profile_id": profile_id},
+        "elastic": elastic_payload,
+        "runtime": {
+            "heartbeat_interval_seconds": runtime_config.get("heartbeat_interval_seconds", 300),
+        },
         "activation_url": f"{NETSENTINEL_API_URL}/agents/{instance.get('id')}/activate",
     }

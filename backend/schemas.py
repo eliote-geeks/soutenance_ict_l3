@@ -78,9 +78,12 @@ class AgentCheckinRequest(BaseModel):
     ip: str | None = None
     os: str | None = None
     activation_applied: bool = False
+    capabilities: dict | None = None
 
 
 class AgentHeartbeatRequest(BaseModel):
     instance_id: str
     service_state: str = "running"
     last_error: str | None = None
+    signals: list | None = None
+    action_results: list | None = None
