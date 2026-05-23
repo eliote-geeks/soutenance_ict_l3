@@ -13,8 +13,54 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { exportReport } from '@/lib/api';
+import { exportReport, fetchAlerts, fetchHosts } from '@/lib/api';
 import { cn } from '@/lib/utils';
+
+const triggerDownload = (content, filename, mimeType = 'text/plain') => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const buildReportText = (type, dateRange, alerts, hosts) => {
+  const now = new Date().toLocaleString('en-GB');
+  const sep = '─'.repeat(60);
+  const lines = [
+    'NETSENTINEL AI — SECURITY REPORT',
+    sep,
+    `Type       : ${type.toUpperCase()}`,
+    `Date range : ${dateRange}`,
+    `Generated  : ${now}`,
+    `Organisation: University of Yaoundé I — Computer Science Dept. — Group P37`,
+    sep,
+    '',
+    '1. ALERT SUMMARY',
+    `   Total alerts : ${alerts.length}`,
+    `   Critical     : ${alerts.filter(a => a.severity === 'critical').length}`,
+    `   High         : ${alerts.filter(a => a.severity === 'high').length}`,
+    `   Medium       : ${alerts.filter(a => a.severity === 'medium').length}`,
+    '',
+    '2. ACTIVE ALERTS',
+    ...alerts.slice(0, 20).map(a =>
+      `   [${(a.severity || 'unknown').toUpperCase().padEnd(8)}] ${a.id} — ${a.title}\n` +
+      `              Source: ${a.sourceIP || '?'} → ${a.hostname || '?'} | MITRE: ${a.mitreTactic || '?'}`
+    ),
+    '',
+    '3. MONITORED ASSETS',
+    `   Total hosts  : ${hosts.length}`,
+    ...hosts.slice(0, 10).map(h =>
+      `   ${(h.hostname || '?').padEnd(25)} ${(h.ip || '').padEnd(16)} Risk: ${h.riskScore ?? '--'}`
+    ),
+    '',
+    sep,
+    'END OF REPORT',
+  ];
+  return lines.join('\n');
+};
 
 const reportTypes = [
   { id: 'executive', name: 'Executive Summary', description: 'High-level overview for leadership' },
@@ -50,24 +96,38 @@ export default function ReportsPage() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await exportReport(selectedReport, { dateRange, format });
-      const reportType = reportTypes.find((r) => r.id === selectedReport);
-      setGeneratedReports((prev) => [
-        {
-          id: `rpt-${Date.now()}`,
-          name: `${reportType?.name} — ${new Date().toLocaleDateString('fr-FR')}`,
-          generatedAt: new Date().toISOString(),
-          format: format.toUpperCase(),
-          type: selectedReport,
-          dateRange,
-        },
-        ...prev,
+      const [alertsResult, hostsResult] = await Promise.allSettled([
+        fetchAlerts(),
+        fetchHosts(),
       ]);
-      toast.success('Report exported', { description: 'Your report is ready for download' });
+      const alerts = alertsResult.status === 'fulfilled' ? (alertsResult.value?.alerts ?? []) : [];
+      const hosts  = hostsResult.status  === 'fulfilled' ? (hostsResult.value?.hosts  ?? []) : [];
+      const reportType = reportTypes.find((r) => r.id === selectedReport);
+      const content = buildReportText(selectedReport, dateRange, alerts, hosts);
+      const filename = `netsentinel-${selectedReport}-${new Date().toISOString().slice(0, 10)}.txt`;
+      const entry = {
+        id: `rpt-${Date.now()}`,
+        name: `${reportType?.name} — ${new Date().toLocaleDateString('en-GB')}`,
+        generatedAt: new Date().toISOString(),
+        format: 'TXT',
+        type: selectedReport,
+        dateRange,
+        content,
+        filename,
+      };
+      setGeneratedReports((prev) => [entry, ...prev]);
+      triggerDownload(content, filename);
+      toast.success('Report downloaded', { description: filename });
     } catch {
       toast.error('Export failed', { description: 'Please try again later' });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleDownloadReport = (report) => {
+    if (report.content) {
+      triggerDownload(report.content, report.filename);
     }
   };
 
@@ -262,7 +322,7 @@ export default function ReportsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant="outline">{report.format}</Badge>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleDownloadReport(report)}>
                       <Download className="w-4 h-4" />
                     </Button>
                   </div>

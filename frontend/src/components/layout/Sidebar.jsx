@@ -118,9 +118,9 @@ export const Sidebar = ({ collapsed, onToggle }) => {
       {!isCollapsed && (
         <div className="p-4 border-t border-border">
           <div className="text-xs text-muted-foreground space-y-0.5">
-            <p className="font-medium text-foreground/80">Université de Yaoundé I</p>
-            <p>Département Informatique</p>
-            <p>Groupe P37</p>
+            <p className="font-medium text-foreground/80">University of Yaoundé I</p>
+            <p>Computer Science Dept.</p>
+            <p>Group P37</p>
           </div>
         </div>
       )}

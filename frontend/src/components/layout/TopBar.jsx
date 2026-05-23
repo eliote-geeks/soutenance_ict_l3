@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff, LogOut, User, Users } from 'lucide-react';
+import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff, LogOut, User, Users, CheckCheck } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
@@ -24,6 +24,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { fetchAlerts } from '@/lib/api';
+
+const SEVERITY_COLOR = { critical: 'text-destructive', high: 'text-warning', medium: 'text-yellow-500' };
+const SEVERITY_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium' };
+
+const relativeTime = (iso) => {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return new Date(iso).toLocaleDateString();
+};
 
 export const TopBar = ({ sidebarCollapsed }) => {
   const { theme, toggleTheme } = useTheme();
@@ -34,13 +46,53 @@ export const TopBar = ({ sidebarCollapsed }) => {
   const [isOnline, setIsOnline] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [environment, setEnvironment] = useState('prod');
+  const [notifications, setNotifications] = useState([]);
+  const [readIds, setReadIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('nst-read-notif') || '[]')); } catch { return new Set(); }
+  });
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const result = await fetchAlerts();
+      const alerts = (result?.alerts || [])
+        .filter(a => ['critical', 'high', 'medium'].includes(a.severity))
+        .sort((a, b) => {
+          const order = { critical: 0, high: 1, medium: 2 };
+          return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+        })
+        .slice(0, 8);
+      setNotifications(alerts);
+      setIsOnline(true);
+    } catch {
+      setIsOnline(false);
+    }
+  }, []);
 
   useEffect(() => {
+    loadNotifications();
     const interval = setInterval(() => {
       setLastRefresh(new Date());
-    }, 5000);
+      loadNotifications();
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadNotifications]);
+
+  const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
+
+  const markAllRead = () => {
+    const all = new Set(notifications.map(n => n.id));
+    setReadIds(all);
+    try { localStorage.setItem('nst-read-notif', JSON.stringify([...all])); } catch {}
+  };
+
+  const markRead = (id) => {
+    setReadIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      try { localStorage.setItem('nst-read-notif', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
 
   const formatLastRefresh = () => {
     const seconds = Math.floor((new Date() - lastRefresh) / 1000);
@@ -173,28 +225,58 @@ export const TopBar = ({ sidebarCollapsed }) => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="w-4 h-4" />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-80 max-h-[420px] overflow-y-auto">
+            <div className="flex items-center justify-between px-2 py-1.5">
+              <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+              {unreadCount > 0 && (
+                <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground" onClick={markAllRead}>
+                  <CheckCheck className="w-3 h-3" />
+                  Mark all read
+                </Button>
+              )}
+            </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium text-destructive">Critical Alert</span>
-              <span className="text-xs text-muted-foreground">Port scan detected from 45.33.32.156</span>
-              <span className="text-xs text-muted-foreground">2 minutes ago</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium text-warning">High Alert</span>
-              <span className="text-xs text-muted-foreground">Brute force attempt on srv-prod-01</span>
-              <span className="text-xs text-muted-foreground">5 minutes ago</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium text-primary">Model Update</span>
-              <span className="text-xs text-muted-foreground">ML model v3.2 deployed successfully</span>
-              <span className="text-xs text-muted-foreground">15 minutes ago</span>
+            {notifications.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">No alerts</div>
+            ) : (
+              notifications.map((notif) => {
+                const isUnread = !readIds.has(notif.id);
+                return (
+                  <DropdownMenuItem
+                    key={notif.id}
+                    className={cn(
+                      "flex flex-col items-start gap-0.5 py-3 cursor-pointer",
+                      isUnread && "bg-accent/30"
+                    )}
+                    onClick={() => {
+                      markRead(notif.id);
+                      navigate('/alerts');
+                    }}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className={cn("font-semibold text-xs", SEVERITY_COLOR[notif.severity])}>
+                        {SEVERITY_LABEL[notif.severity] || notif.severity} — {notif.id}
+                      </span>
+                      {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
+                    </div>
+                    <span className="text-sm text-foreground leading-snug">{notif.title}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {notif.sourceIP} → {notif.hostname} · {relativeTime(notif.timestamp)}
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="justify-center text-xs text-primary font-medium" onClick={() => navigate('/alerts')}>
+              View all alerts →
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

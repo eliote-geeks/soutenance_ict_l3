@@ -500,7 +500,7 @@ export default function AlertsPage() {
 
       {/* Alert Detail Dialog */}
       <Dialog open={!!selectedAlert} onOpenChange={() => setSelectedAlert(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           {selectedAlert && (() => {
             const attack   = parseAttackType(selectedAlert.title);
             const detector = parseDetector(selectedAlert.title, selectedAlert.sourceType);
@@ -534,7 +534,7 @@ export default function AlertsPage() {
                   <DialogDescription>{selectedAlert.description}</DialogDescription>
                 </DialogHeader>
 
-                <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4 py-4 overflow-y-auto flex-1 pr-1">
                   <div className="space-y-3">
                     <div>
                       <span className="text-xs text-muted-foreground">Attack type</span>
