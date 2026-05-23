@@ -768,6 +768,8 @@ async def chatbot_ask(request: ChatbotRequest):
             "usedFallback": True,
         }
 
+from .setup_router import router as setup_router
+app.include_router(setup_router)
 app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,

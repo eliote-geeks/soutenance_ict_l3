@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { ScopeProvider } from '@/context/ScopeContext';
@@ -6,6 +7,7 @@ import { AuthLayout } from '@/components/auth/AuthLayout';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
 import { Toaster } from '@/components/ui/sonner';
 import AIAssistant from '@/components/shared/AIAssistant';
+import SetupPage from '@/pages/SetupPage';
 
 // ─── Active pages ────────────────────────────────────────────────────────────
 import OverviewPage      from '@/pages/OverviewPage';
@@ -32,6 +34,24 @@ import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage';
 // ProfilePage      → hardcoded mock data
 // SettingsPage     → no backend for settings
 
+const BACKEND = 'http://127.0.0.1:8010';
+
+function SetupGuard({ children }) {
+  const [checked, setChecked] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+
+  useEffect(() => {
+    fetch(`${BACKEND}/api/setup/status`)
+      .then(r => r.json())
+      .then(d => { setNeedsSetup(!d.configured); setChecked(true); })
+      .catch(() => setChecked(true)); // backend unreachable → skip guard, show normal app
+  }, []);
+
+  if (!checked) return null; // brief blank while checking
+  if (needsSetup) return <Navigate to="/setup" replace />;
+  return children;
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -39,6 +59,9 @@ function App() {
         <ScopeProvider>
           <BrowserRouter>
             <Routes>
+              {/* ── Setup wizard (public, no auth, no sidebar) ──────────── */}
+              <Route path="/setup" element={<SetupPage />} />
+
               {/* ── Auth routes (no sidebar) ────────────────────────────── */}
               <Route element={<AuthLayout />}>
                 <Route path="/login"    element={<LoginPage />} />
@@ -47,7 +70,7 @@ function App() {
               </Route>
 
               {/* ── Protected routes (with sidebar) ─────────────────────── */}
-              <Route element={<ProtectedLayout />}>
+              <Route element={<SetupGuard><ProtectedLayout /></SetupGuard>}>
                 <Route path="/"          element={<OverviewPage />} />
                 <Route path="/stream"    element={<LiveStreamPage />} />
                 <Route path="/logs"      element={<LogsExplorerPage />} />
