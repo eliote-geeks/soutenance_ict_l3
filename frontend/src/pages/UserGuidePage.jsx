@@ -400,26 +400,118 @@ const SECTIONS = [
     border: 'border-gray-400/20',
     label: 'Configuration',
     route: null,
-    summary: 'backend/.env — all settings in one place',
+    summary: 'backend/.env — toutes les clés, leur rôle et comment les modifier',
     content: [
       {
-        type: 'config',
+        type: 'explain',
+        title: 'Fichier de configuration',
         items: [
-          { key: 'ELASTICSEARCH_URL',      desc: 'URL of your Elasticsearch cluster (http or https).' },
-          { key: 'ELASTICSEARCH_USERNAME', desc: 'Elastic username (elastic by default).' },
-          { key: 'ELASTICSEARCH_PASSWORD', desc: 'Elastic password.' },
-          { key: 'ELASTICSEARCH_API_KEY',  desc: 'Optional — use instead of username/password.' },
-          { key: 'ADMIN_API_SECRET',       desc: 'Secret header required to manage agents and tokens.' },
-          { key: 'CORS_ORIGINS',           desc: 'Frontend URL allowed to call the API.' },
-          { key: 'AI_SERVICE_URL',         desc: 'URL of the Python AI engine (port 9000 by default).' },
-          { key: 'NETSENTINEL_API_URL',    desc: 'Public URL of the backend — used in agent install commands.' },
+          { label: 'Emplacement', desc: 'backend/.env — à la racine du dossier backend. Créez-le s\'il n\'existe pas.' },
+          { label: 'Chargement', desc: 'Chargé au démarrage du backend via python-dotenv. Tout changement nécessite un redémarrage.' },
+          { label: 'Priorité', desc: 'Les variables d\'environnement système ont priorité sur le fichier .env.' },
+          { label: 'Sécurité', desc: 'Ne jamais versionner ce fichier (.gitignore). Il contient des mots de passe et secrets.' },
+        ],
+      },
+      {
+        type: 'codeblock',
+        title: 'Contenu complet du fichier backend/.env',
+        language: 'env',
+        code: `# ── Elasticsearch ──────────────────────────────────────────────
+ELASTICSEARCH_URL=http://79.137.32.27:9201
+ELASTICSEARCH_USERNAME=elastic
+ELASTICSEARCH_PASSWORD=<votre_mot_de_passe>
+ELASTICSEARCH_API_KEY=                        # Laisser vide si user/pass utilisé
+ELASTICSEARCH_VERIFY_TLS=false                # true si certificat TLS valide
+
+# ── Indices Elasticsearch ──────────────────────────────────────
+FILEBEAT_INDEX=filebeat-*
+PACKETBEAT_INDEX=packetbeat-*
+METRICBEAT_INDEX=.ds-metricbeat-*
+AI_ALERTS_INDEX=ai-alerts-*
+INGEST_AI_ALERTS_INDEX=ai-alerts-manual
+AGENT_TOKENS_INDEX=netsentinel-agent-enrollment-tokens
+AGENT_INSTANCES_INDEX=netsentinel-agent-instances
+
+# ── API Backend ────────────────────────────────────────────────
+NETSENTINEL_API_URL=http://127.0.0.1:8010
+AI_SERVICE_URL=http://127.0.0.1:9000
+ADMIN_API_SECRET=netsentinel-admin-dev-secret  # À CHANGER en production !
+ALLOW_AGENT_BASIC_AUTH=true
+
+# ── Frontend (CORS) ────────────────────────────────────────────
+CORS_ORIGINS=http://localhost:3000
+
+# ── Stockage ───────────────────────────────────────────────────
+NETSENTINEL_STORAGE_BACKEND=elastic           # elastic | json
+NETSENTINEL_TELEMETRY_BACKEND=elastic
+STORAGE_JSON_PATH=./state/storage.json
+TELEMETRY_JSON_PATH=./state/telemetry.json`,
+      },
+      {
+        type: 'config',
+        title: 'Référence de toutes les clés',
+        items: [
+          { key: 'ELASTICSEARCH_URL',           desc: 'URL complète du cluster ES. http ou https, avec le port (9200 par défaut, 9201 ici).' },
+          { key: 'ELASTICSEARCH_USERNAME',      desc: 'Nom d\'utilisateur Elasticsearch. Valeur par défaut : elastic.' },
+          { key: 'ELASTICSEARCH_PASSWORD',      desc: 'Mot de passe Elasticsearch. Généré à l\'installation ou défini dans kibana.' },
+          { key: 'ELASTICSEARCH_API_KEY',       desc: 'Clé API ES (base64). Alternative au couple user/password. Laisser vide si non utilisée.' },
+          { key: 'ELASTICSEARCH_VERIFY_TLS',    desc: 'false = accepte les certificats auto-signés. Mettre true en production avec un vrai cert.' },
+          { key: 'FILEBEAT_INDEX',              desc: 'Pattern d\'index pour les logs Filebeat. Défaut : filebeat-*' },
+          { key: 'PACKETBEAT_INDEX',            desc: 'Pattern d\'index pour les flux réseau Packetbeat. Défaut : packetbeat-*' },
+          { key: 'METRICBEAT_INDEX',            desc: 'Pattern d\'index pour les métriques Metricbeat (data stream). Défaut : .ds-metricbeat-*' },
+          { key: 'AI_ALERTS_INDEX',             desc: 'Index de lecture des alertes IA générées. Défaut : ai-alerts-*' },
+          { key: 'INGEST_AI_ALERTS_INDEX',      desc: 'Index d\'écriture pour les alertes créées manuellement. Défaut : ai-alerts-manual' },
+          { key: 'AGENT_TOKENS_INDEX',          desc: 'Index stockant les tokens d\'enrollment des agents.' },
+          { key: 'AGENT_INSTANCES_INDEX',       desc: 'Index stockant les instances d\'agents (état, heartbeat, config).' },
+          { key: 'NETSENTINEL_API_URL',         desc: 'URL publique du backend. Incluse dans la commande d\'installation des agents.' },
+          { key: 'AI_SERVICE_URL',              desc: 'URL du micro-service Python IA (OCSVM). Port 9000 par défaut.' },
+          { key: 'ADMIN_API_SECRET',            desc: 'En-tête secret (X-Admin-Secret) requis pour approuver des agents et créer des tokens.' },
+          { key: 'ALLOW_AGENT_BASIC_AUTH',      desc: 'true = les agents peuvent s\'authentifier avec user/password ES en plus de la clé API.' },
+          { key: 'CORS_ORIGINS',                desc: 'URL(s) du frontend autorisées à appeler l\'API. Séparer par virgule pour plusieurs origines.' },
+          { key: 'NETSENTINEL_STORAGE_BACKEND', desc: 'elastic = données dans ES (prod). json = fichier local (mode hors-ligne/démo).' },
+          { key: 'NETSENTINEL_TELEMETRY_BACKEND', desc: 'Même logique pour les données de télémétrie.' },
+          { key: 'STORAGE_JSON_PATH',           desc: 'Chemin du fichier JSON si backend=json. Défaut : ./state/storage.json' },
+          { key: 'TELEMETRY_JSON_PATH',         desc: 'Chemin du fichier JSON telemetry si backend=json.' },
+        ],
+      },
+      {
+        type: 'steps',
+        title: 'Changer de cluster Elasticsearch',
+        items: [
+          { label: 'Ouvrir backend/.env', desc: 'Éditez le fichier avec n\'importe quel éditeur texte (nano, vim, VS Code).' },
+          { label: 'Modifier ELASTICSEARCH_URL', desc: 'Exemple : ELASTICSEARCH_URL=http://192.168.1.100:9200' },
+          { label: 'Mettre à jour les credentials', desc: 'Changez ELASTICSEARCH_USERNAME et ELASTICSEARCH_PASSWORD selon les identifiants du nouveau cluster.' },
+          { label: 'Redémarrer le backend', desc: 'Tuez le processus uvicorn (Ctrl+C ou fuser -k 8010/tcp) puis relancez : cd backend && ../.venv/bin/python3 -m uvicorn server:app --host 0.0.0.0 --port 8010' },
+          { label: 'Vérifier la connexion', desc: 'Ouvrez Stack Health (/pipeline) — Elasticsearch doit passer au vert.' },
+        ],
+      },
+      {
+        type: 'steps',
+        title: 'Utiliser une API Key au lieu de user/password',
+        items: [
+          { label: 'Créer une API Key dans Kibana', desc: 'Kibana → Stack Management → API Keys → Create API Key. Copier la valeur encoded.' },
+          { label: 'Coller dans .env', desc: 'ELASTICSEARCH_API_KEY=<valeur_base64_copiée>' },
+          { label: 'Vider les champs user/pass', desc: 'ELASTICSEARCH_USERNAME= et ELASTICSEARCH_PASSWORD= (laisser vides).' },
+          { label: 'Redémarrer le backend', desc: 'Le backend utilisera automatiquement la clé API si elle est définie.' },
+        ],
+      },
+      {
+        type: 'steps',
+        title: 'Passer en mode hors-ligne (JSON)',
+        items: [
+          { label: 'Changer le backend de stockage', desc: 'NETSENTINEL_STORAGE_BACKEND=json et NETSENTINEL_TELEMETRY_BACKEND=json' },
+          { label: 'Vérifier le chemin des fichiers', desc: 'STORAGE_JSON_PATH=./state/storage.json — le dossier state/ est créé automatiquement.' },
+          { label: 'Redémarrer le backend', desc: 'Le backend lit et écrit dans les fichiers JSON locaux. Aucune connexion ES n\'est requise.' },
+          { label: 'Repasser en mode elastic', desc: 'NETSENTINEL_STORAGE_BACKEND=elastic puis redémarrage.' },
         ],
       },
       {
         type: 'tips',
         items: [
-          { type: 'warning', text: 'After editing backend/.env, restart the backend: kill the uvicorn process and re-run start.sh.' },
-          { type: 'tip',     text: 'Switch to JSON storage (offline mode) by setting NETSENTINEL_STORAGE_BACKEND=json.' },
+          { type: 'warning', text: 'Tout changement dans backend/.env nécessite un redémarrage complet du backend — les variables ne se rechargent pas à chaud.' },
+          { type: 'warning', text: 'Changez ADMIN_API_SECRET en production. La valeur par défaut (netsentinel-admin-dev-secret) est publique sur GitHub.' },
+          { type: 'tip',     text: 'Pour plusieurs origines CORS : CORS_ORIGINS=http://localhost:3000,https://mon-domaine.com' },
+          { type: 'info',    text: 'Si ELASTICSEARCH_VERIFY_TLS=false et que l\'URL est https://, les avertissements SSL sont supprimés côté Python.' },
         ],
       },
     ],
@@ -551,12 +643,29 @@ function SectionCard({ section, index, searchQuery }) {
                 </div>
               )}
 
+              {block.type === 'codeblock' && (
+                <div className="rounded-lg overflow-hidden border border-border/60">
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-muted/60 border-b border-border/40">
+                    <span className="text-xs font-mono text-muted-foreground">{block.language || 'bash'}</span>
+                    <button
+                      className="text-xs text-primary hover:text-primary/70 transition-colors"
+                      onClick={() => navigator.clipboard?.writeText(block.code)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre className="p-4 text-xs font-mono leading-relaxed overflow-x-auto bg-muted/20 text-foreground/80 whitespace-pre">
+                    {block.code}
+                  </pre>
+                </div>
+              )}
+
               {block.type === 'config' && (
                 <div className="space-y-1.5 font-mono text-xs">
                   {block.items.map((item, ii) => (
-                    <div key={ii} className="flex gap-3 p-2.5 rounded-lg bg-muted/40 border border-border/40">
-                      <span className="text-primary font-semibold flex-shrink-0 w-52">{item.key}</span>
-                      <span className="text-muted-foreground leading-relaxed">{item.desc}</span>
+                    <div key={ii} className="flex gap-3 p-2.5 rounded-lg bg-muted/40 border border-border/40 hover:bg-muted/60 transition-colors">
+                      <span className="text-primary font-semibold flex-shrink-0 w-60">{item.key}</span>
+                      <span className="text-muted-foreground leading-relaxed font-sans">{item.desc}</span>
                     </div>
                   ))}
                 </div>
