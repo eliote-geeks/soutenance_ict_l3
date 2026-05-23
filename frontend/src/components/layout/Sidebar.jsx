@@ -12,6 +12,7 @@ import {
   Shield,
   Bot,
   BookOpen,
+  RotateCcw,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -113,6 +114,28 @@ export const Sidebar = ({ collapsed, onToggle }) => {
               )}
             </NavLink>
           ))}
+        </div>
+
+        {/* ── Danger zone ──────────────────────────────────────────────────── */}
+        <div className="mt-2 pt-2 border-t border-border/50">
+          {!isCollapsed && (
+            <p className="px-2 mb-1 text-[11px] uppercase tracking-wide text-destructive/60">
+              Danger
+            </p>
+          )}
+          <NavLink
+            to="/reset"
+            className={({ isActive }) =>
+              cn('sidebar-item relative group', isActive && 'active text-destructive')
+            }
+          >
+            <RotateCcw className="w-5 h-5 flex-shrink-0 text-destructive/70 group-hover:text-destructive transition-colors" />
+            {!isCollapsed && (
+              <span className="truncate animate-fade-in text-destructive/80 group-hover:text-destructive">
+                Reset App
+              </span>
+            )}
+          </NavLink>
         </div>
       </nav>
 
