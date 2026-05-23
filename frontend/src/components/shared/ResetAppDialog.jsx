@@ -312,13 +312,14 @@ function Step3Auth({ onNext, onBack, onClose }) {
 }
 
 /* ─── STEP 4 — Confirmation finale ───────────────────────────────────────── */
-const CONFIRM_WORD = 'RÉINITIALISER';
+const CONFIRM_WORD = 'RESET';
 
 function Step4Confirm({ adminSecret, onBack, onClose }) {
   const navigate = useNavigate();
-  const [typed, setTyped]   = useState('');
+  const [typed, setTyped]     = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
+  const [success, setSuccess] = useState(false);
+  const [error, setError]     = useState('');
 
   const confirmed = typed.trim().toUpperCase() === CONFIRM_WORD;
 
@@ -333,21 +334,44 @@ function Step4Confirm({ adminSecret, onBack, onClose }) {
       });
       if (res.status === 403) {
         setError('Secret admin refusé par le serveur.');
+        setLoading(false);
         return;
       }
       const data = await res.json();
       if (data.ok) {
-        // Short delay so the user sees the success state
-        setTimeout(() => navigate('/setup'), 1200);
+        setSuccess(true);      // afficher l'écran succès
+        setLoading(false);
+        setTimeout(() => navigate('/setup'), 2000);
       } else {
         setError(data.detail || 'Erreur lors de la réinitialisation.');
+        setLoading(false);
       }
     } catch {
-      setError('Impossible de joindre le backend.');
-    } finally {
+      setError('Impossible de joindre le backend (port 8010).');
       setLoading(false);
     }
   };
+
+  /* ── Écran succès ── */
+  if (success) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-5 p-10 text-center">
+        <div className="w-16 h-16 rounded-full bg-success/15 border border-success/30 flex items-center justify-center">
+          <Check className="w-8 h-8 text-success" />
+        </div>
+        <div>
+          <p className="text-lg font-bold text-foreground">Configuration supprimée</p>
+          <p className="text-sm text-muted-foreground mt-1">Redirection vers le wizard de configuration…</p>
+        </div>
+        <div className="w-48 h-1 rounded-full bg-muted overflow-hidden">
+          <div className="h-full bg-primary rounded-full animate-[grow_2s_ease-in-out_forwards]"
+            style={{ animation: 'width 2s linear forwards', width: '0%' }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">Vous allez être redirigé dans 2 secondes…</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -378,12 +402,12 @@ function Step4Confirm({ adminSecret, onBack, onClose }) {
 
         <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-center space-y-1">
           <p className="text-sm font-bold text-destructive">⚠ Cette action est irréversible</p>
-          <p className="text-xs text-destructive/80">Le fichier .env sera supprimé définitivement.</p>
+          <p className="text-xs text-destructive/80">Le fichier .env sera supprimé et l'app redirigée vers le wizard.</p>
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
-            Tapez <code className="bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-mono text-xs">{CONFIRM_WORD}</code> pour confirmer
+            Tapez <code className="bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-mono font-bold">{CONFIRM_WORD}</code> pour confirmer
           </label>
           <Input
             value={typed}
@@ -391,11 +415,17 @@ function Step4Confirm({ adminSecret, onBack, onClose }) {
             onKeyDown={e => e.key === 'Enter' && confirmed && execute()}
             placeholder={CONFIRM_WORD}
             className={cn(
-              'font-mono text-center tracking-widest',
+              'font-mono text-center tracking-widest text-base',
               confirmed ? 'border-destructive focus-visible:ring-destructive/30' : ''
             )}
+            autoFocus
           />
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20">
+              <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0" />
+              <p className="text-xs text-destructive">{error}</p>
+            </div>
+          )}
         </div>
       </div>
 
