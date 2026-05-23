@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, Download, Lock, Trash2,
@@ -25,17 +26,26 @@ function StepDot({ n, current, done }) {
   );
 }
 
-/* ─── Modal shell ─────────────────────────────────────────────────────────── */
+/* ─── Modal shell — rendered via portal directly into document.body ───────── */
 function Modal({ children, onClose }) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ zIndex: 99999 }}
+    >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in">
+      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in"
+        style={{ zIndex: 100000 }}
+      >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
