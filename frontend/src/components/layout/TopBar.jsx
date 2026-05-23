@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff, LogOut, User, Users, CheckCheck } from 'lucide-react';
+import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff, LogOut, User, Users, CheckCheck, RotateCcw } from 'lucide-react';
+import { ResetAppDialog } from '@/components/shared/ResetAppDialog';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
@@ -322,6 +323,18 @@ export const TopBar = ({ sidebarCollapsed }) => {
               <Settings className="w-4 h-4" />
               Settings
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <ResetAppDialog
+              trigger={
+                <DropdownMenuItem
+                  onSelect={e => e.preventDefault()}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset App
+                </DropdownMenuItem>
+              }
+            />
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {

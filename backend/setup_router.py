@@ -82,6 +82,50 @@ async def test_connection(body: ConnectionTestRequest):
         return {"ok": False, "error": str(exc)}
 
 
+@router.get("/current-config")
+async def current_config():
+    """Return current .env content with sensitive values masked for display."""
+    if not ENV_PATH.exists():
+        return {"exists": False, "lines": []}
+    lines = []
+    MASK_KEYS = {"ELASTICSEARCH_PASSWORD", "ELASTICSEARCH_API_KEY", "ADMIN_API_SECRET"}
+    for raw in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        if "=" in raw and not raw.strip().startswith("#"):
+            key, _, val = raw.partition("=")
+            k = key.strip()
+            if k in MASK_KEYS and val:
+                display = val[:4] + "•" * min(len(val) - 4, 12) if len(val) > 4 else "••••"
+            else:
+                display = val
+            lines.append({"key": k, "value": display, "raw": raw})
+        else:
+            lines.append({"key": "", "value": raw, "raw": raw})
+    return {"exists": True, "lines": lines}
+
+
+class ResetRequest(BaseModel):
+    admin_secret: str
+    dry_run: bool = False
+
+
+@router.post("/reset")
+async def reset_app(body: ResetRequest):
+    """Delete backend/.env and mark app as unconfigured. Requires admin secret."""
+    from .config import ADMIN_API_SECRET
+    if body.admin_secret != ADMIN_API_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Secret admin incorrect.")
+    if body.dry_run:
+        return {"ok": True}  # just checking the secret is valid
+    if ENV_PATH.exists():
+        ENV_PATH.unlink()
+    # Clear key env vars so setup/status returns configured=false immediately
+    for key in ("ELASTICSEARCH_URL", "ELASTICSEARCH_USERNAME", "ELASTICSEARCH_PASSWORD",
+                "ELASTICSEARCH_API_KEY", "ADMIN_API_SECRET"):
+        os.environ.pop(key, None)
+    return {"ok": True}
+
+
 @router.post("/complete")
 async def setup_complete(body: SetupCompleteRequest):
     """Write backend/.env and hot-reload config vars into the running process."""
