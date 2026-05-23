@@ -90,7 +90,7 @@ Utilisez le **sélecteur de scope** dans la TopBar pour filtrer tous les KPIs su
 
   /* ── Alerts ── */
   {
-    tags: ['alert', 'alerte', 'alerts', 'alertes', 'critiqu', 'severity', 'sévérité', 'triage', 'acknowledge', 'block', 'isolate', 'playbook'],
+    tags: ['alert', 'alerte', 'alerts', 'alertes', 'critiqu', 'severity', 'sévérité', 'triage', 'acknowledge', 'block', 'isolate', 'playbook', 'bloquer', 'block ip', 'ip attaquante', 'attaquante', 'bloquer ip'],
     answer: `La page **Alerts** (/alerts) liste toutes les alertes de sécurité.
 
 **Colonnes du tableau :**
@@ -278,7 +278,7 @@ Chaque page de l'app possède aussi un bouton **?** (bas droite) qui ouvre un pa
 
   /* ── Configuration ── */
   {
-    tags: ['config', 'configuration', '.env', 'env', 'configurer', 'paramètre', 'setting', 'elasticsearch url', 'password', 'mot de passe', 'api key', 'secret', 'cors', 'redémarrer', 'restart'],
+    tags: ['config', 'configuration', '.env', 'env', 'configurer', 'paramètre', 'setting', 'elasticsearch url', 'password', 'mot de passe', 'api key', 'secret', 'cors', 'redémarrer', 'restart', 'changer', 'modifier', 'elasticsearch password', 'changer mot de passe', 'changer elasticsearch'],
     answer: `La configuration se trouve dans **\`backend/.env\`**.
 
 **Clés principales :**
@@ -314,7 +314,7 @@ Le choix est sauvegardé automatiquement dans le localStorage — il persiste ap
 
   /* ── Login / Auth ── */
   {
-    tags: ['login', 'connexion', 'authentification', 'mot de passe', 'utilisateur', 'user', 'compte', 'register', 'inscription', 'déconnexion', 'logout'],
+    tags: ['login', 'connexion', 'authentification', 'mot de passe login', 'utilisateur', 'user', 'compte', 'register', 'inscription', 'déconnexion', 'logout', 'connecter', 'se connecter', 'comment se connecter', 'identifiant', 'email', 'password login'],
     answer: `**Connexion** : rendez-vous sur \`http://localhost:3000/login\`.
 
 - Entrez votre email et mot de passe
