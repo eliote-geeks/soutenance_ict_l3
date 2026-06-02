@@ -19,7 +19,7 @@ from typing import Any
 
 from .config import LOOKBACK_MINUTES, ML_BUCKET_MINUTES, ML_HISTORY_HOURS
 from .elastic import filebeat_hits, packetbeat_hits
-from .features import aggregate_current_features, aggregate_historical_windows
+from .features import aggregate_current_features, aggregate_historical_windows, aggregate_flow_features
 from .heuristics import (
     detect_dns_anomaly,
     detect_lateral_movement,
@@ -73,6 +73,8 @@ def run_detection_cycle() -> dict[str, Any]:
     history_rows = aggregate_historical_windows(
         history_log_hits, history_network_hits, ML_BUCKET_MINUTES
     )
+    # Flow-level features for RandomForest (CICIDS-compatible)
+    flow_rows = aggregate_flow_features(network_hits)
 
     # ------------------------------------------------------------------
     # 4 & 5. Run all detectors
@@ -88,7 +90,7 @@ def run_detection_cycle() -> dict[str, Any]:
 
     # --- ML detectors ---
     findings.extend(detect_ml_anomalies(current_rows, history_rows))
-    findings.extend(detect_rf_attacks(current_rows))
+    findings.extend(detect_rf_attacks(current_rows, flow_rows))
 
     # ------------------------------------------------------------------
     # 6. Deduplicate (same signature = same finding, keep first)
@@ -119,6 +121,7 @@ def run_detection_cycle() -> dict[str, Any]:
         "filebeatDocuments": len(log_hits),
         "packetbeatDocuments": len(network_hits),
         "featureRows": len(current_rows),
+        "flowRows": len(flow_rows),
         "historyRows": len(history_rows),
         "findingsDetected": len(unique),
         "findingsByDetector": _count_by_detector(unique),

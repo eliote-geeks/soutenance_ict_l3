@@ -176,22 +176,26 @@ def load_rf_model() -> tuple[Any, Any]:
 def rf_feature_vector(row: dict[str, Any]) -> list[float]:
     """
     Feature vector for the Random Forest classifier.
-    Maps live aggregated features to the format the RF model expects.
+    Matches CICIDS2018 columns exactly — same names, same scale.
+    Must match the columns used in train_random_forest.py.
     """
     return [
-        float(row["event_count"]),           # traffic volume
-        float(row["is_internal"]),            # internal source flag
-        float(row["failed_logins"]),          # failed authentication count
-        float(row["dns_errors"]),             # DNS error count
-        float(row["distinct_ports"]),         # port diversity
-        float(row["distinct_destinations"]),  # destination diversity
-        float(row["protocol_count"]),         # protocol diversity
-        float(row["http_path_count"]),        # HTTP activity
+        float(row.get("flow_packets_per_s", 0)),  # Flow Packets/s
+        float(row.get("flow_bytes_per_s",   0)),  # Flow Bytes/s
+        float(row.get("fwd_packets_length", 0)),  # Fwd Packets Length Total
+        float(row.get("bwd_packets_length", 0)),  # Bwd Packets Length Total
+        float(row.get("total_fwd_packets",  0)),  # Total Fwd Packets
+        float(row.get("total_bwd_packets",  0)),  # Total Backward Packets
+        float(row.get("down_up_ratio",      0)),  # Down/Up Ratio
+        float(row.get("avg_packet_size",    0)),  # Avg Packet Size
+        float(row.get("protocol",           0)),  # Protocol
+        float(row.get("flow_duration_us",   0)),  # Flow Duration
     ]
 
 
 def detect_rf_attacks(
     current_rows: list[dict[str, Any]],
+    flow_rows: list[dict[str, Any]] | None = None,
 ) -> list[FindingPayload]:
     """
     Classify known attack types using a pre-trained RandomForest.
@@ -200,15 +204,19 @@ def detect_rf_attacks(
     - Run train_random_forest.py once to produce the saved model
     - Skips predictions with confidence below 0.60 to reduce false positives
     """
-    if not SKLEARN_AVAILABLE or not current_rows:
+    if not SKLEARN_AVAILABLE:
+        return []
+
+    # Use flow_rows if provided, otherwise fall back to current_rows
+    rows = flow_rows if flow_rows else current_rows
+    if not rows:
         return []
 
     model, scaler = load_rf_model()
     if model is None:
-        # Model not trained yet — silently skip (will work once trained)
         return []
 
-    vectors = scaler.transform([rf_feature_vector(r) for r in current_rows])
+    vectors = scaler.transform([rf_feature_vector(r) for r in rows])
     predictions = model.predict(vectors)
     probabilities = model.predict_proba(vectors)
 
@@ -218,7 +226,7 @@ def detect_rf_attacks(
             continue
 
         confidence = round(float(max(proba)), 2)
-        if confidence < 0.60:
+        if confidence < 0.45:
             continue  # Skip low-confidence predictions
 
         mitre, severity = ATTACK_MITRE.get(pred, ("Discovery", "medium"))

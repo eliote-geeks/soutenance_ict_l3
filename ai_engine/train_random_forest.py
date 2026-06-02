@@ -1,86 +1,180 @@
 """
-Train the RandomForest classifier on NSL-KDD-style synthetic data.
-Run once to produce state/models/random_forest.pkl
+Train RandomForest on CICIDS2018 using exact columns
+that match Packetbeat flow data extracted by aggregate_flow_features().
+
+Feature vector (10 features, must match rf_feature_vector in ml_models.py):
+  0  flow_packets_per_s   Flow Packets/s
+  1  flow_bytes_per_s     Flow Bytes/s
+  2  fwd_packets_length   Fwd Packets Length Total
+  3  bwd_packets_length   Bwd Packets Length Total
+  4  total_fwd_packets    Total Fwd Packets
+  5  total_bwd_packets    Total Backward Packets
+  6  down_up_ratio        Down/Up Ratio
+  7  avg_packet_size      Avg Packet Size
+  8  protocol             Protocol
+  9  flow_duration_us     Flow Duration
 """
-import sys
+
+import sys, warnings
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+warnings.filterwarnings("ignore")
 
-import joblib
 import numpy as np
+import pandas as pd
+import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 
 from ai_engine.config import MODEL_DIR, RF_MODEL_PATH, RF_SCALER_PATH
 
-# ── Synthetic training data ─────────────────────────────────────────────────
-# Features: event_count, is_internal, failed_logins, dns_errors,
-#           distinct_ports, distinct_destinations, protocol_count, http_path_count
+DATASETS_DIR  = Path(__file__).parent / "datasets"
+RANDOM_STATE  = 42
+MAX_PER_CLASS = 15_000
+MIN_PER_CLASS = 20
 
-np.random.seed(42)
+CICIDS_COLS = [
+    "Flow Packets/s",
+    "Flow Bytes/s",
+    "Fwd Packets Length Total",
+    "Bwd Packets Length Total",
+    "Total Fwd Packets",
+    "Total Backward Packets",
+    "Down/Up Ratio",
+    "Avg Packet Size",
+    "Protocol",
+    "Flow Duration",
+    "Label",
+]
 
-def make_samples(n, label, event_range, internal, logins, dns,
-                 ports, dests, protos, paths):
-    X = np.column_stack([
-        np.random.randint(*event_range, n),   # event_count
-        np.full(n, internal),                  # is_internal
-        np.random.randint(*logins, n),         # failed_logins
-        np.random.randint(*dns, n),            # dns_errors
-        np.random.randint(*ports, n),          # distinct_ports
-        np.random.randint(*dests, n),          # distinct_destinations
-        np.random.randint(*protos, n),         # protocol_count
-        np.random.randint(*paths, n),          # http_path_count
-    ])
-    y = np.full(n, label)
-    return X, y
+LABEL_MAP = {
+    "Benign":                          "normal",
+    "Bot":                             "c2_beaconing",
+    "DDoS":                            "ddos",
+    "DoS Hulk":                        "dos",
+    "DoS GoldenEye":                   "dos",
+    "DoS slowloris":                   "dos",
+    "DoS Slowhttptest":                "dos",
+    "Heartbleed":                      "probe",
+    "FTP-Patator":                     "bruteforce",
+    "SSH-Patator":                     "bruteforce",
+    "PortScan":                        "probe",
+    "Infiltration":                    "lateral_movement",
+    "Web Attack \ufffd Brute Force":   "web_attack",
+    "Web Attack \ufffd XSS":           "web_attack",
+    "Web Attack \ufffd Sql Injection": "web_attack",
+}
 
-# Normal traffic
-X_normal, y_normal   = make_samples(400, "normal",
-    (10,200), 1, (0,1), (0,2), (1,5), (1,8), (1,4), (0,10))
+def load() -> pd.DataFrame:
+    files = sorted(DATASETS_DIR.glob("*.parquet"))
+    print(f"Loading {len(files)} files...")
+    dfs = []
+    for f in files:
+        print(f"  {f.name}...", end=" ", flush=True)
+        df = pd.read_parquet(f, columns=CICIDS_COLS)
+        df["Label"] = df["Label"].map(LABEL_MAP)
+        df = df.dropna(subset=["Label"])
+        print(f"{len(df):,} rows")
+        dfs.append(df)
+    return pd.concat(dfs, ignore_index=True)
 
-# Brute force — many failed logins
-X_brute, y_brute     = make_samples(200, "bruteforce",
-    (50,300), 0, (15,80), (0,3), (1,3), (1,4), (1,3), (0,5))
+def clean(df: pd.DataFrame) -> pd.DataFrame:
+    feat_cols = [c for c in CICIDS_COLS if c != "Label"]
+    for col in feat_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df[feat_cols] = df[feat_cols].replace(
+        [np.inf, -np.inf], np.nan
+    ).fillna(0)
+    # Clip extreme outliers per column (keep 99.5th percentile)
+    for col in feat_cols:
+        cap = df[col].quantile(0.995)
+        df[col] = df[col].clip(lower=0, upper=cap)
+    return df
 
-# Port scan — many distinct ports
-X_probe, y_probe     = make_samples(200, "probe",
-    (100,500), 0, (0,2), (0,3), (20,100), (5,30), (2,6), (0,5))
+def balance(df: pd.DataFrame) -> pd.DataFrame:
+    print("\nBalancing classes:")
+    parts = []
+    for label, grp in df.groupby("Label"):
+        n = len(grp)
+        if n < MIN_PER_CLASS:
+            print(f"  SKIP  {label:<25} ({n} rows)")
+            continue
+        if n > MAX_PER_CLASS:
+            grp = grp.sample(MAX_PER_CLASS, random_state=RANDOM_STATE)
+            print(f"  CAP   {label:<25} {n:>8,} → {MAX_PER_CLASS:,}")
+        else:
+            print(f"  KEEP  {label:<25} {n:>8,}")
+        parts.append(grp)
+    return pd.concat(parts, ignore_index=True)
 
-# DoS — very high event count
-X_dos, y_dos         = make_samples(200, "dos",
-    (500,2000), 0, (0,2), (0,5), (1,4), (1,3), (1,3), (0,3))
+def main():
+    print("=" * 60)
+    print("NetSentinel RF — Real CICIDS2018 Training")
+    print("=" * 60)
 
-# Privilege escalation — internal, some failed logins + sudo events
-X_priv, y_priv       = make_samples(150, "privilege_escalation",
-    (20,100), 1, (5,20), (0,3), (1,4), (1,5), (1,3), (0,4))
+    df = load()
+    df = clean(df)
 
-# Combine
-X = np.vstack([X_normal, X_brute, X_probe, X_dos, X_priv]).astype(float)
-y = np.concatenate([y_normal, y_brute, y_probe, y_dos, y_priv])
+    print(f"\nTotal: {len(df):,} rows")
+    for lbl, cnt in df["Label"].value_counts().items():
+        print(f"  {lbl:<25} {cnt:>10,}")
 
-# ── Train ───────────────────────────────────────────────────────────────────
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+    df = balance(df)
 
-model = RandomForestClassifier(
-    n_estimators=200,
-    max_depth=12,
-    min_samples_leaf=2,
-    random_state=42,
-    class_weight="balanced",
-)
-model.fit(X_scaled, y)
+    feat_cols = [c for c in CICIDS_COLS if c != "Label"]
+    X = df[feat_cols].values.astype(float)
+    y = df["Label"].values
 
-# ── Evaluate ────────────────────────────────────────────────────────────────
-print("\n=== Training Report ===")
-print(classification_report(y, model.predict(X_scaled)))
-print(f"Classes: {model.classes_}")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y
+    )
 
-# ── Save ────────────────────────────────────────────────────────────────────
-MODEL_DIR.mkdir(parents=True, exist_ok=True)
-joblib.dump(model, RF_MODEL_PATH)
-joblib.dump(scaler, RF_SCALER_PATH)
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s  = scaler.transform(X_test)
 
-print(f"\n✅ RandomForest saved to: {RF_MODEL_PATH}")
-print(f"✅ Scaler saved to:        {RF_SCALER_PATH}")
+    print(f"\nTraining on {len(X_train):,} rows...")
+    model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=20,
+        min_samples_leaf=2,
+        class_weight="balanced",
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+        verbose=1,
+    )
+    model.fit(X_train_s, y_train)
+
+    print("\n" + "=" * 60)
+    print("TEST SET EVALUATION")
+    print("=" * 60)
+    print(classification_report(
+        y_test, model.predict(X_test_s), zero_division=0
+    ))
+
+    print("=" * 60)
+    print("FEATURE IMPORTANCE")
+    print("=" * 60)
+    your_names = [
+        "flow_packets_per_s", "flow_bytes_per_s",
+        "fwd_packets_length", "bwd_packets_length",
+        "total_fwd_packets",  "total_bwd_packets",
+        "down_up_ratio",      "avg_packet_size",
+        "protocol",           "flow_duration_us",
+    ]
+    for name, imp in sorted(
+        zip(your_names, model.feature_importances_), key=lambda x: -x[1]
+    ):
+        print(f"  {name:<25} {imp:.3f}  {'█' * int(imp * 60)}")
+
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model,  RF_MODEL_PATH)
+    joblib.dump(scaler, RF_SCALER_PATH)
+    print(f"\n✅ Model  → {RF_MODEL_PATH}")
+    print(f"✅ Scaler → {RF_SCALER_PATH}")
+    print(f"\nClasses: {sorted(model.classes_)}")
+
+if __name__ == "__main__":
+    main()

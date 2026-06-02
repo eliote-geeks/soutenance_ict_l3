@@ -261,3 +261,147 @@ def aggregate_historical_windows(
         }
         for (ip, bucket), row in buckets.items()
     ]
+
+# ---------------------------------------------------------------------------
+# Flow-level feature extraction (for RandomForest — CICIDS-compatible)
+# ---------------------------------------------------------------------------
+
+def extract_flow_features(hit: dict) -> dict | None:
+    """
+    Extract per-flow features from a Packetbeat document.
+    Feature names and scales match CICIDS2018 columns exactly.
+    Returns None if essential fields are missing.
+    """
+    src = hit.get("_source", {})
+
+    net       = src.get("network") or {}
+    source    = src.get("source")  or {}
+    dest      = src.get("destination") or {}
+    event     = src.get("event")   or {}
+
+    # Essential fields — skip flow if missing
+    net_bytes   = net.get("bytes")
+    net_packets = net.get("packets")
+    src_ip      = source.get("ip")
+    dst_ip      = dest.get("ip")
+    duration_ns = event.get("duration")  # nanoseconds
+
+    if None in (net_bytes, net_packets, src_ip, dst_ip, duration_ns):
+        return None
+    if net_packets == 0 or duration_ns == 0:
+        return None
+
+    duration_us = max(duration_ns / 1_000, 1)      # microseconds (CICIDS unit)
+    duration_s  = duration_ns / 1_000_000_000       # seconds
+
+    src_bytes   = float(source.get("bytes")   or 0)
+    dst_bytes   = float(dest.get("bytes")     or 0)
+    src_packets = float(source.get("packets") or 0)
+    dst_packets = float(dest.get("packets")   or 0)
+    transport   = str(net.get("transport")    or "").lower()
+
+    # Derived metrics
+    flow_packets_per_s = float(net_packets) / duration_s
+    flow_bytes_per_s   = float(net_bytes)   / duration_s
+    avg_packet_size    = float(net_bytes)   / float(net_packets)
+    down_up_ratio      = (dst_bytes / src_bytes) if src_bytes > 0 else 0.0
+    protocol_num       = 6 if transport == "tcp" else (
+                         17 if transport == "udp" else 0)
+
+    return {
+        # Identity
+        "source_ip":   src_ip,
+        "dest_ip":     dst_ip,
+        "src_port":    int(source.get("port") or 0),
+        "dst_port":    int(dest.get("port")   or 0),
+        "hostname":    (src.get("host") or {}).get("name"),
+
+        # CICIDS-compatible features (same names, same scale)
+        "flow_packets_per_s":    flow_packets_per_s,   # Flow Packets/s
+        "flow_bytes_per_s":      flow_bytes_per_s,     # Flow Bytes/s
+        "fwd_packets_length":    src_bytes,            # Fwd Packets Length Total
+        "bwd_packets_length":    dst_bytes,            # Bwd Packets Length Total
+        "total_fwd_packets":     src_packets,          # Total Fwd Packets
+        "total_bwd_packets":     dst_packets,          # Total Backward Packets
+        "down_up_ratio":         down_up_ratio,        # Down/Up Ratio
+        "avg_packet_size":       avg_packet_size,      # Avg Packet Size
+        "protocol":              protocol_num,          # Protocol (6=TCP,17=UDP)
+        "flow_duration_us":      duration_us,          # Flow Duration (microsec)
+    }
+
+
+def aggregate_flow_features(
+    packet_hits: list,
+) -> list[dict]:
+    """
+    Convert raw Packetbeat hits into per-source-IP flow feature rows
+    for the RandomForest classifier.
+    Each row aggregates all flows from the same source IP.
+    """
+    from collections import defaultdict
+
+    buckets: dict[str, dict] = defaultdict(lambda: {
+        "source_ip": None,
+        "hostname":  None,
+        "flow_count": 0,
+        "flow_packets_per_s":  [],
+        "flow_bytes_per_s":    [],
+        "fwd_packets_length":  0.0,
+        "bwd_packets_length":  0.0,
+        "total_fwd_packets":   0.0,
+        "total_bwd_packets":   0.0,
+        "down_up_ratios":      [],
+        "avg_packet_sizes":    [],
+        "protocols":           set(),
+        "flow_durations":      [],
+    })
+
+    for hit in packet_hits:
+        flow = extract_flow_features(hit)
+        if flow is None:
+            continue
+
+        ip  = flow["source_ip"]
+        row = buckets[ip]
+        row["source_ip"] = ip
+        row["hostname"]  = row["hostname"] or flow["hostname"]
+        row["flow_count"] += 1
+
+        row["flow_packets_per_s"].append(flow["flow_packets_per_s"])
+        row["flow_bytes_per_s"].append(flow["flow_bytes_per_s"])
+        row["fwd_packets_length"] += flow["fwd_packets_length"]
+        row["bwd_packets_length"] += flow["bwd_packets_length"]
+        row["total_fwd_packets"]  += flow["total_fwd_packets"]
+        row["total_bwd_packets"]  += flow["total_bwd_packets"]
+        row["down_up_ratios"].append(flow["down_up_ratio"])
+        row["avg_packet_sizes"].append(flow["avg_packet_size"])
+        row["protocols"].add(flow["protocol"])
+        row["flow_durations"].append(flow["flow_duration_us"])
+
+    import statistics as _stats
+
+    result = []
+    for ip, row in buckets.items():
+        if row["flow_count"] == 0:
+            continue
+
+        def safe_mean(lst):
+            return sum(lst) / len(lst) if lst else 0.0
+
+        result.append({
+            "source_ip":          ip,
+            "hostname":           row["hostname"],
+            # Aggregated CICIDS-compatible features
+            "flow_packets_per_s": safe_mean(row["flow_packets_per_s"]),
+            "flow_bytes_per_s":   safe_mean(row["flow_bytes_per_s"]),
+            "fwd_packets_length": row["fwd_packets_length"],
+            "bwd_packets_length": row["bwd_packets_length"],
+            "total_fwd_packets":  row["total_fwd_packets"],
+            "total_bwd_packets":  row["total_bwd_packets"],
+            "down_up_ratio":      safe_mean(row["down_up_ratios"]),
+            "avg_packet_size":    safe_mean(row["avg_packet_sizes"]),
+            "protocol":           max(row["protocols"]) if row["protocols"] else 0,
+            "flow_duration_us":   safe_mean(row["flow_durations"]),
+        })
+
+    return result
