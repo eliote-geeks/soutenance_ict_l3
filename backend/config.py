@@ -15,6 +15,8 @@ ELASTICSEARCH_USERNAME = os.environ.get("ELASTICSEARCH_USERNAME")
 ELASTICSEARCH_PASSWORD = os.environ.get("ELASTICSEARCH_PASSWORD")
 ELASTICSEARCH_API_KEY = os.environ.get("ELASTICSEARCH_API_KEY")
 ELASTICSEARCH_VERIFY_TLS = os.environ.get("ELASTICSEARCH_VERIFY_TLS", "true").lower() == "true"
+AGENT_ELASTIC_API_KEY = os.environ.get("AGENT_ELASTIC_API_KEY")
+ALLOW_AGENT_BASIC_AUTH = os.environ.get("ALLOW_AGENT_BASIC_AUTH", "false").lower() == "true"
 FILEBEAT_INDEX = os.environ.get("FILEBEAT_INDEX", "filebeat-*")
 PACKETBEAT_INDEX = os.environ.get("PACKETBEAT_INDEX", "packetbeat-*")
 METRICBEAT_INDEX = os.environ.get("METRICBEAT_INDEX", ".ds-metricbeat-*")

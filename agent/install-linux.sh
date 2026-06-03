@@ -5,6 +5,11 @@ ELASTIC_URL=""
 USERNAME=""
 PASSWORD=""
 API_KEY=""
+ELASTIC_VERIFY_TLS="true"
+ALLOW_BASIC_AUTH="${NETSENTINEL_ALLOW_BASIC_AUTH:-false}"
+FILEBEAT_INDEX="filebeat-*"
+PACKETBEAT_INDEX="packetbeat-*"
+METRICBEAT_INDEX=".ds-metricbeat-*"
 API_URL=""
 ENROLLMENT_TOKEN=""
 SITE="default-site"
@@ -45,6 +50,10 @@ while [[ $# -gt 0 ]]; do
     --username) USERNAME="$2"; shift 2 ;;
     --password) PASSWORD="$2"; shift 2 ;;
     --api-key) API_KEY="$2"; shift 2 ;;
+    --elastic-verify-tls) ELASTIC_VERIFY_TLS="$2"; shift 2 ;;
+    --filebeat-index) FILEBEAT_INDEX="$2"; shift 2 ;;
+    --packetbeat-index) PACKETBEAT_INDEX="$2"; shift 2 ;;
+    --metricbeat-index) METRICBEAT_INDEX="$2"; shift 2 ;;
     --api-url) API_URL="${2%/}"; shift 2 ;;
     --enrollment-token) ENROLLMENT_TOKEN="$2"; shift 2 ;;
     --site) SITE="$2"; shift 2 ;;
@@ -115,7 +124,7 @@ validate_elastic_credentials() {
   if [[ -n "$API_KEY" ]]; then
     return
   fi
-  if [[ -n "$USERNAME" && -n "$PASSWORD" && "${NETSENTINEL_ALLOW_BASIC_AUTH:-false}" == "true" ]]; then
+  if [[ -n "$USERNAME" && -n "$PASSWORD" && "$ALLOW_BASIC_AUTH" == "true" ]]; then
     return
   fi
   echo "Elastic API key is required. Basic auth is blocked unless NETSENTINEL_ALLOW_BASIC_AUTH=true." >&2
@@ -186,12 +195,21 @@ install_beats() {
   apt-get install -y filebeat packetbeat metricbeat
 }
 
+write_ssl_block() {
+  if [[ "${ELASTIC_VERIFY_TLS,,}" == "false" ]]; then
+    cat <<'EOF'
+  ssl.verification_mode: none
+EOF
+  fi
+}
+
 write_output_block() {
   if [[ -n "$API_KEY" ]]; then
     cat <<EOF
 output.elasticsearch:
   hosts: ["$ELASTIC_URL"]
   api_key: "$API_KEY"
+$(write_ssl_block)
 EOF
   else
     cat <<EOF
@@ -199,6 +217,7 @@ output.elasticsearch:
   hosts: ["$ELASTIC_URL"]
   username: "$USERNAME"
   password: "$PASSWORD"
+$(write_ssl_block)
 EOF
   fi
 }
@@ -310,11 +329,26 @@ EOF
 save_state() {
   local instance_id="$1"
   local status="$2"
-  python3 - "$STATE_FILE" "$instance_id" "$status" "$API_URL" "$ASSET_ID" "$PROFILE_ID" "$HOSTNAME_VALUE" "$IP_VALUE" "$OS_VALUE" "$RUNTIME_HEARTBEAT_INTERVAL_SECONDS" <<'PY'
+  python3 - "$STATE_FILE" "$instance_id" "$status" "$API_URL" "$ASSET_ID" "$PROFILE_ID" "$HOSTNAME_VALUE" "$IP_VALUE" "$OS_VALUE" "$RUNTIME_HEARTBEAT_INTERVAL_SECONDS" "$ELASTIC_VERIFY_TLS" "$FILEBEAT_INDEX" "$PACKETBEAT_INDEX" "$METRICBEAT_INDEX" <<'PY'
 import json
 import sys
 
-path, instance_id, status, api_url, asset_id, profile_id, hostname, ip_value, os_value, runtime_interval = sys.argv[1:]
+(
+    path,
+    instance_id,
+    status,
+    api_url,
+    asset_id,
+    profile_id,
+    hostname,
+    ip_value,
+    os_value,
+    runtime_interval,
+    elastic_verify_tls,
+    filebeat_index,
+    packetbeat_index,
+    metricbeat_index,
+) = sys.argv[1:]
 payload = {
     "instance_id": instance_id,
     "status": status,
@@ -325,6 +359,14 @@ payload = {
     "ip": ip_value,
     "os": os_value,
     "runtime_heartbeat_interval_seconds": int(runtime_interval or 300),
+    "elastic": {
+        "verify_tls": elastic_verify_tls,
+        "indices": {
+            "filebeat": filebeat_index,
+            "packetbeat": packetbeat_index,
+            "metricbeat": metricbeat_index,
+        },
+    },
 }
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, indent=2)
@@ -349,6 +391,17 @@ for key in ("instance_id", "status", "api_url", "asset_id", "profile_id", "hostn
     value = payload.get(key, "")
     shell_key = key.upper()
     print(f"{shell_key}={shlex.quote(str(value))}")
+elastic = payload.get("elastic") or {}
+indices = elastic.get("indices") or {}
+extra = {
+    "ELASTIC_VERIFY_TLS": elastic.get("verify_tls", ""),
+    "FILEBEAT_INDEX": indices.get("filebeat", ""),
+    "PACKETBEAT_INDEX": indices.get("packetbeat", ""),
+    "METRICBEAT_INDEX": indices.get("metricbeat", ""),
+}
+for key, value in extra.items():
+    if value != "":
+        print(f"{key}={shlex.quote(str(value))}")
 PY
 )"
 }
@@ -384,6 +437,12 @@ fields = {
     "ACTIVATION_API_KEY": elastic.get("api_key", ""),
     "ACTIVATION_USERNAME": elastic.get("username", ""),
     "ACTIVATION_PASSWORD": elastic.get("password", ""),
+    "ACTIVATION_AUTH_MODE": elastic.get("auth_mode", ""),
+    "ACTIVATION_ALLOW_BASIC_AUTH": str(elastic.get("allow_basic_auth", False)).lower(),
+    "ACTIVATION_ELASTIC_VERIFY_TLS": str(elastic.get("verify_tls", True)).lower(),
+    "ACTIVATION_FILEBEAT_INDEX": (elastic.get("indices") or {}).get("filebeat", ""),
+    "ACTIVATION_PACKETBEAT_INDEX": (elastic.get("indices") or {}).get("packetbeat", ""),
+    "ACTIVATION_METRICBEAT_INDEX": (elastic.get("indices") or {}).get("metricbeat", ""),
     "ACTIVATION_SITE": asset.get("site", ""),
     "ACTIVATION_ROLE": asset.get("role", ""),
     "ACTIVATION_ENVIRONMENT": asset.get("environment", ""),
@@ -404,6 +463,13 @@ apply_activation() {
   API_KEY="$ACTIVATION_API_KEY"
   USERNAME="$ACTIVATION_USERNAME"
   PASSWORD="$ACTIVATION_PASSWORD"
+  if [[ "$ACTIVATION_AUTH_MODE" == "basic" && "$ACTIVATION_ALLOW_BASIC_AUTH" == "true" ]]; then
+    ALLOW_BASIC_AUTH="true"
+  fi
+  ELASTIC_VERIFY_TLS="${ACTIVATION_ELASTIC_VERIFY_TLS:-$ELASTIC_VERIFY_TLS}"
+  FILEBEAT_INDEX="${ACTIVATION_FILEBEAT_INDEX:-$FILEBEAT_INDEX}"
+  PACKETBEAT_INDEX="${ACTIVATION_PACKETBEAT_INDEX:-$PACKETBEAT_INDEX}"
+  METRICBEAT_INDEX="${ACTIVATION_METRICBEAT_INDEX:-$METRICBEAT_INDEX}"
   SITE="${ACTIVATION_SITE:-$SITE}"
   ROLE="${ACTIVATION_ROLE:-$ROLE}"
   ENVIRONMENT="${ACTIVATION_ENVIRONMENT:-$ENVIRONMENT}"

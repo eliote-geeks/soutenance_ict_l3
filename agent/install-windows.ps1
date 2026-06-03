@@ -3,6 +3,10 @@ param(
   [string]$Username,
   [string]$Password,
   [string]$ApiKey,
+  [string]$ElasticVerifyTls = "true",
+  [string]$FilebeatIndex = "filebeat-*",
+  [string]$PacketbeatIndex = "packetbeat-*",
+  [string]$MetricbeatIndex = ".ds-metricbeat-*",
   [string]$ApiUrl,
   [string]$EnrollmentToken,
   [string]$Site = "default-site",
@@ -28,6 +32,7 @@ $triageDir = "C:\ProgramData\NetSentinelAgent\triage"
 $runtimeScriptPath = Join-Path $beatsRoot "runtime-windows.ps1"
 $runtimeTaskName = "NetSentinelAgentRuntime"
 $runtimeIntervalSeconds = 300
+$allowBasicAuth = $env:NETSENTINEL_ALLOW_BASIC_AUTH -eq "true"
 $downloadsRoot = Join-Path $env:TEMP "NetSentinelAgent"
 $beatServices = @("filebeat", "packetbeat", "metricbeat", "winlogbeat")
 $hostnameValue = $env:COMPUTERNAME
@@ -67,7 +72,7 @@ function Assert-ElasticCredentials {
   if ($ApiKey) {
     return
   }
-  if ($Username -and $Password -and $env:NETSENTINEL_ALLOW_BASIC_AUTH -eq "true") {
+  if ($Username -and $Password -and $allowBasicAuth) {
     return
   }
   throw "Elastic API key is required. Basic auth is blocked unless NETSENTINEL_ALLOW_BASIC_AUTH=true."
@@ -126,11 +131,16 @@ function Uninstall-Agent {
 }
 
 function Get-OutputBlock {
+  $sslBlock = ""
+  if ($ElasticVerifyTls -eq "false") {
+    $sslBlock = "  ssl.verification_mode: none`n"
+  }
   if ($ApiKey) {
     return @"
 output.elasticsearch:
   hosts: ["$ElasticUrl"]
   api_key: "$ApiKey"
+$sslBlock
 "@
   }
   if ($Username -and $Password) {
@@ -139,6 +149,7 @@ output.elasticsearch:
   hosts: ["$ElasticUrl"]
   username: "$Username"
   password: "$Password"
+$sslBlock
 "@
   }
   throw "Missing Elasticsearch credentials. Provide -ApiKey or -Username/-Password."
@@ -232,6 +243,14 @@ function Save-State {
     agent_version = $AgentVersion
     beats_version = $BeatsVersion
     runtime_heartbeat_interval_seconds = $runtimeIntervalSeconds
+    elastic = @{
+      verify_tls = $ElasticVerifyTls
+      indices = @{
+        filebeat = $FilebeatIndex
+        packetbeat = $PacketbeatIndex
+        metricbeat = $MetricbeatIndex
+      }
+    }
   }
   Initialize-AgentDirectories
   $payload | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $stateFile
@@ -354,6 +373,17 @@ function Apply-Activation {
   $script:ApiKey = $elastic.api_key
   $script:Username = $elastic.username
   $script:Password = $elastic.password
+  if ($elastic.auth_mode -eq "basic" -and $elastic.allow_basic_auth -eq $true) {
+    $script:allowBasicAuth = $true
+  }
+  if ($null -ne $elastic.verify_tls) {
+    $script:ElasticVerifyTls = "$($elastic.verify_tls)".ToLowerInvariant()
+  }
+  if ($elastic.indices) {
+    if ($elastic.indices.filebeat) { $script:FilebeatIndex = $elastic.indices.filebeat }
+    if ($elastic.indices.packetbeat) { $script:PacketbeatIndex = $elastic.indices.packetbeat }
+    if ($elastic.indices.metricbeat) { $script:MetricbeatIndex = $elastic.indices.metricbeat }
+  }
   $script:Site = $asset.site
   $script:Role = $asset.role
   $script:Environment = $asset.environment
@@ -436,6 +466,14 @@ if ($Upgrade) {
   if ($state.runtime_heartbeat_interval_seconds) {
     $runtimeIntervalSeconds = [int]$state.runtime_heartbeat_interval_seconds
   }
+  if ($state.elastic) {
+    if ($state.elastic.verify_tls) { $ElasticVerifyTls = $state.elastic.verify_tls }
+    if ($state.elastic.indices) {
+      if ($state.elastic.indices.filebeat) { $FilebeatIndex = $state.elastic.indices.filebeat }
+      if ($state.elastic.indices.packetbeat) { $PacketbeatIndex = $state.elastic.indices.packetbeat }
+      if ($state.elastic.indices.metricbeat) { $MetricbeatIndex = $state.elastic.indices.metricbeat }
+    }
+  }
   Stop-RuntimeTask
   Assert-ApiReachable
   Wait-ForApproval -InstanceId $state.instance_id
@@ -452,6 +490,14 @@ if ($Resume) {
   }
   if ($state.runtime_heartbeat_interval_seconds) {
     $runtimeIntervalSeconds = [int]$state.runtime_heartbeat_interval_seconds
+  }
+  if ($state.elastic) {
+    if ($state.elastic.verify_tls) { $ElasticVerifyTls = $state.elastic.verify_tls }
+    if ($state.elastic.indices) {
+      if ($state.elastic.indices.filebeat) { $FilebeatIndex = $state.elastic.indices.filebeat }
+      if ($state.elastic.indices.packetbeat) { $PacketbeatIndex = $state.elastic.indices.packetbeat }
+      if ($state.elastic.indices.metricbeat) { $MetricbeatIndex = $state.elastic.indices.metricbeat }
+    }
   }
   Assert-ApiReachable
   Wait-ForApproval -InstanceId $state.instance_id

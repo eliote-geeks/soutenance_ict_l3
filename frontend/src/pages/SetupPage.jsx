@@ -188,6 +188,16 @@ function StepElastic({ values, onChange, onNext, onBack }) {
           </Field>
         </div>
 
+        <div className="md:col-span-2">
+          <Field label="API Key agent (recommandé)" hint="Clé dédiée envoyée aux agents pour écrire les données Beats. Si vide, l'agent utilise l'API key ES principale ou le fallback autorisé.">
+            <Input
+              placeholder="Clé API Elasticsearch dédiée aux agents"
+              value={values.agent_elastic_api_key}
+              onChange={e => onChange('agent_elastic_api_key', e.target.value)}
+            />
+          </Field>
+        </div>
+
         <div className="md:col-span-2 flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
           <input
             type="checkbox"
@@ -390,6 +400,7 @@ function StepSummary({ values, onBack, onFinish, finishing, error }) {
     { label: 'Nom d\'utilisateur ES',   value: values.elasticsearch_username },
     { label: 'Mot de passe ES',         value: '•'.repeat(Math.min(values.elasticsearch_password.length, 12)) || '(vide)' },
     { label: 'API Key ES',              value: values.elasticsearch_api_key ? '••••••' + values.elasticsearch_api_key.slice(-4) : '(non définie)' },
+    { label: 'API Key agent',           value: values.agent_elastic_api_key ? '••••••' + values.agent_elastic_api_key.slice(-4) : '(fallback)' },
     { label: 'Vérifier TLS',            value: values.elasticsearch_verify_tls ? 'Oui' : 'Non' },
     { label: 'Secret admin',            value: '•'.repeat(Math.min(values.admin_api_secret.length, 16)) },
     { label: 'CORS Origins',            value: values.cors_origins },
@@ -458,6 +469,7 @@ export default function SetupPage() {
     elasticsearch_username: 'elastic',
     elasticsearch_password: '',
     elasticsearch_api_key: '',
+    agent_elastic_api_key: '',
     elasticsearch_verify_tls: false,
     admin_api_secret: generateSecret(32),
     cors_origins: 'http://localhost:3000',

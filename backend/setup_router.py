@@ -26,6 +26,7 @@ class SetupCompleteRequest(BaseModel):
     elasticsearch_username: str = "elastic"
     elasticsearch_password: str = ""
     elasticsearch_api_key: str = ""
+    agent_elastic_api_key: str = ""
     elasticsearch_verify_tls: bool = False
     admin_api_secret: str = "netsentinel-admin-dev-secret"
     cors_origins: str = "http://localhost:3000"
@@ -88,7 +89,7 @@ async def current_config():
     if not ENV_PATH.exists():
         return {"exists": False, "lines": []}
     lines = []
-    MASK_KEYS = {"ELASTICSEARCH_PASSWORD", "ELASTICSEARCH_API_KEY", "ADMIN_API_SECRET"}
+    MASK_KEYS = {"ELASTICSEARCH_PASSWORD", "ELASTICSEARCH_API_KEY", "AGENT_ELASTIC_API_KEY", "ADMIN_API_SECRET"}
     for raw in ENV_PATH.read_text(encoding="utf-8").splitlines():
         if "=" in raw and not raw.strip().startswith("#"):
             key, _, val = raw.partition("=")
@@ -139,6 +140,7 @@ async def setup_complete(body: SetupCompleteRequest):
         f"ELASTICSEARCH_USERNAME={body.elasticsearch_username}",
         f"ELASTICSEARCH_PASSWORD={body.elasticsearch_password}",
         f"ELASTICSEARCH_API_KEY={body.elasticsearch_api_key}",
+        f"AGENT_ELASTIC_API_KEY={body.agent_elastic_api_key}",
         f"ELASTICSEARCH_VERIFY_TLS={'true' if body.elasticsearch_verify_tls else 'false'}",
         f"FILEBEAT_INDEX={body.filebeat_index}",
         f"PACKETBEAT_INDEX={body.packetbeat_index}",
@@ -162,7 +164,15 @@ async def setup_complete(body: SetupCompleteRequest):
         "ELASTICSEARCH_USERNAME": body.elasticsearch_username,
         "ELASTICSEARCH_PASSWORD": body.elasticsearch_password,
         "ELASTICSEARCH_API_KEY": body.elasticsearch_api_key,
+        "AGENT_ELASTIC_API_KEY": body.agent_elastic_api_key,
         "ELASTICSEARCH_VERIFY_TLS": "true" if body.elasticsearch_verify_tls else "false",
+        "FILEBEAT_INDEX": body.filebeat_index,
+        "PACKETBEAT_INDEX": body.packetbeat_index,
+        "METRICBEAT_INDEX": body.metricbeat_index,
+        "AI_ALERTS_INDEX": body.ai_alerts_index,
+        "AGENT_TOKENS_INDEX": body.agent_tokens_index,
+        "AGENT_INSTANCES_INDEX": body.agent_instances_index,
+        "ALLOW_AGENT_BASIC_AUTH": "true",
         "ADMIN_API_SECRET": body.admin_api_secret,
         "CORS_ORIGINS": body.cors_origins,
         "NETSENTINEL_API_URL": body.netsentinel_api_url,
@@ -174,7 +184,9 @@ async def setup_complete(body: SetupCompleteRequest):
     # Hot-reload the config module so subsequent requests use the new values
     try:
         from . import config as cfg_module
+        from . import agents as agents_module
         importlib.reload(cfg_module)
+        importlib.reload(agents_module)
     except Exception:
         pass
 
