@@ -59,7 +59,7 @@ except ImportError:
 
 
 def current_alerts() -> list[dict]:
-    raw = fetch_elastic_alerts() or deepcopy(AI_FINDINGS_BUFFER) or []
+    raw = fetch_elastic_alerts()
     enriched = []
     for item in raw:
         clone = dict(item)

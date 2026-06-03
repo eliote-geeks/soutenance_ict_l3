@@ -145,7 +145,7 @@ def aggregate_packetbeat_traffic(default_points: list[dict], alerts: list[dict])
         result = elastic_request("GET", f"/{PACKETBEAT_INDEX}/_search", payload)
         buckets = ((((result or {}).get("aggregations") or {}).get("traffic_over_time") or {}).get("buckets")) or []
         if not buckets:
-            return default_points
+            return []
         points = []
         for bucket in buckets:
             dt = parse_dt(bucket.get("key_as_string"))

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -85,5 +87,5 @@ class AgentHeartbeatRequest(BaseModel):
     instance_id: str
     service_state: str = "running"
     last_error: str | None = None
-    signals: list | None = None
-    action_results: list | None = None
+    signals: dict[str, Any] | None = None
+    action_results: list[dict[str, Any]] | None = None

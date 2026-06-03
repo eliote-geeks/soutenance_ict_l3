@@ -563,7 +563,7 @@ async def stream(profile_id: str | None = None, asset_id: str | None = None):
         elastic_logs = filter_logs_by_scope(fetch_elastic_logs(), resolved_scope)
         if elastic_logs:
             return {"events": elastic_events_from_logs(elastic_logs), "metrics": derive_realtime_metrics([], elastic_logs, alerts)}
-        return {"events": live_events(), "metrics": derive_realtime_metrics([], logs_feed(), alerts)}
+        return {"events": [], "metrics": derive_realtime_metrics([], [], alerts)}
     return await asyncio.to_thread(_compute)
 
 
@@ -572,7 +572,6 @@ async def logs(profile_id: str | None = None, asset_id: str | None = None):
     import asyncio
     return await asyncio.to_thread(lambda: (lambda p: {"logs": p, "total": len(p), "page": 1, "pageSize": len(p)})(
         filter_logs_by_scope(fetch_elastic_logs(), resolve_scope(profile_id=profile_id, asset_id=asset_id))
-        or filter_logs_by_scope(logs_feed(), resolve_scope(profile_id=profile_id, asset_id=asset_id))
     ))
 
 

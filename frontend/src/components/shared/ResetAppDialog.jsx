@@ -95,7 +95,7 @@ function Step1Warning({ onNext, onClose }) {
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conséquences</p>
           {[
-            'La connexion Elasticsearch sera perdue — les pages afficheront des données mock.',
+            "La connexion Elasticsearch sera perdue — les pages resteront vides jusqu'à une nouvelle configuration.",
             'Tous les agents actifs perdront leur connexion au backend.',
             'Les tokens d\'enrollment seront invalidés.',
             'Le secret admin sera effacé — les agents ne pourront plus être approuvés.',

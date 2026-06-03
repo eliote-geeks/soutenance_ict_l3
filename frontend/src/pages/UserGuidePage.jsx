@@ -59,7 +59,7 @@ const SECTIONS = [
         type: 'explain',
         title: 'What you see',
         items: [
-          { label: 'Total Alerts', desc: 'Count of all detections currently in Elasticsearch (or mock data if ES is empty).' },
+          { label: 'Total Alerts', desc: 'Count of all detections currently in Elasticsearch.' },
           { label: 'Anomaly Score', desc: 'Composite score 0–100 derived from alert severity, packet volume and log anomalies.' },
           { label: 'Mean Time to Detect', desc: 'Average minutes between event occurrence and alert creation.' },
           { label: 'Risky Hosts', desc: 'Top 5 hosts by risk score — computed from CPU, alert count and agent status.' },
@@ -94,7 +94,7 @@ const SECTIONS = [
           { label: 'Status', desc: 'Open → Investigating → Resolved. Changes via Acknowledge button.' },
           { label: 'Source → Hostname', desc: 'Attack origin IP and targeted internal host.' },
           { label: 'MITRE Tactic', desc: 'ATT&CK kill-chain stage: Discovery, Credential Access, C2, etc.' },
-          { label: 'Assignee', desc: 'SOC analyst responsible. Currently set per alert in mock data.' },
+          { label: 'Assignee', desc: 'SOC analyst responsible when the alert payload includes one.' },
           { label: 'ETA', desc: 'Estimated resolution time.' },
         ],
       },
@@ -114,7 +114,7 @@ const SECTIONS = [
         items: [
           { type: 'tip',     text: 'Use the filter bar to show only Critical+Open alerts — the highest priority queue.' },
           { type: 'warning', text: 'Block IP and Isolate Host require an active approved agent on the target host.' },
-          { type: 'info',    text: 'Alert data comes from Elasticsearch ai-alerts-* index. If empty, mock data is shown.' },
+          { type: 'info',    text: 'Alert data comes from Elasticsearch ai-alerts-* index. If empty, the alert queue stays empty.' },
         ],
       },
     ],
@@ -174,7 +174,7 @@ const SECTIONS = [
         type: 'tips',
         items: [
           { type: 'tip',  text: 'The feed auto-scrolls. Pause it to inspect specific events without losing them.' },
-          { type: 'info', text: 'Data source priority: Packetbeat → Filebeat → mock events. Install agents to get real data.' },
+          { type: 'info', text: 'Data source priority: Packetbeat → Filebeat. If Elastic has no events, the feed stays empty.' },
         ],
       },
     ],

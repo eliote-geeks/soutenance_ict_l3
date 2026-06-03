@@ -145,7 +145,7 @@ Les incidents sont **auto-générés** à partir des alertes — un pattern d'at
 - **Resume** — reprend le scroll en vidant le buffer
 - Le compteur en bas à droite montre les events des 5 dernières secondes
 
-Source : Packetbeat en priorité → Filebeat → données mock si aucun agent actif.`,
+Source : Packetbeat en priorité → Filebeat. Sans événements Elastic, le feed reste vide.`,
   },
 
   /* ── Logs ── */
@@ -390,14 +390,14 @@ La santé du cluster est visible sur la page **Stack Health** (/pipeline).`,
 - ← (sidebar) → réduire/agrandir la barre latérale`,
   },
 
-  /* ── Données réelles vs mock ── */
+  /* ── Données réelles ── */
   {
     tags: ['données', 'data', 'réelles', 'real', 'mock', 'fausses', 'fake', 'elasticsearch vide', 'sans données'],
     answer: `NetSentinel affiche des **données réelles** depuis Elasticsearch quand les agents sont actifs.
 
-**Hiérarchie de fallback :**
+**Comportement actuel :**
 - Si Elasticsearch répond et a des données → **données réelles**
-- Si ES est vide → **données mock** (générées côté serveur pour la démonstration)
+- Si ES est vide → listes vides, sans injection de données de démonstration
 - Si le backend est inaccessible → la topbar passe en rouge (WifiOff)
 
 **Pour avoir de vraies données :**

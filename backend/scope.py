@@ -133,7 +133,7 @@ def scope_summary(scope: dict[str, Any]) -> dict[str, Any]:
 
 
 def current_alerts() -> list[dict[str, Any]]:
-    raw = fetch_elastic_alerts() or deepcopy(AI_FINDINGS_BUFFER) or deepcopy(ALERTS)
+    raw = fetch_elastic_alerts()
     enriched = []
     for item in raw:
         clone = dict(item)

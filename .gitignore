@@ -65,6 +65,8 @@ chainlit.md
 agenthub/agents/youtube/db
 ai-engine/state/attack_dictionary_enterprise.json
 ai-engine/state/*.json
+ai-engine/state/models/
+backend/state/
 var/
 
 # Archive files and large assets

@@ -29,10 +29,10 @@ import RegisterPage      from '@/pages/auth/RegisterPage';
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage';
 
 // ─── Removed pages ──────────────────────────────────────────────────────────
-// NetworkMapPage   → 100% fake/hardcoded data, misleads the jury
+// NetworkMapPage   → removed: static network diagram, not backed by Elastic
 // PredictionsPage  → claims LSTM which is not implemented
 // UsersPage        → no user management backend
-// ProfilePage      → hardcoded mock data
+// ProfilePage      → removed: no backend-backed profile data
 // SettingsPage     → no backend for settings
 
 const BACKEND = 'http://127.0.0.1:8010';
