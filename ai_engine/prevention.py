@@ -11,10 +11,14 @@ All blocking decisions go through this module so they can be controlled
 via environment variables and a whitelist.
 """
 
+import logging
+
 import requests
 
 from .config import AUTO_BLOCK_ENABLED, AUTO_BLOCK_SEVERITIES, NETSENTINEL_BACKEND_URL
 from .schemas import FindingPayload
+
+logger = logging.getLogger("netsentinel.prevention")
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +49,7 @@ def auto_block_if_critical(findings: list[FindingPayload]) -> list[str]:
         return []
 
     blocked: list[str] = []
+    seen: set[str] = set()
 
     for finding in findings:
         # Only act on configured severities (default: critical only)
@@ -59,16 +64,26 @@ def auto_block_if_critical(findings: list[FindingPayload]) -> list[str]:
         if finding.source_ip in NEVER_BLOCK:
             continue
 
+        # Deux detecteurs qui trouvent la meme IP ne justifient qu'un blocage
+        if finding.source_ip in seen:
+            continue
+        seen.add(finding.source_ip)
+
         try:
             response = requests.post(
                 f"{NETSENTINEL_BACKEND_URL}/api/firewall/block",
-                json={"ip": finding.source_ip},
+                json={
+                    "ip": finding.source_ip,
+                    # La machine attaquee : c'est son agent qui posera la regle.
+                    "hostname": finding.hostname,
+                    "reason": f"NetSentinel: {finding.title} (confiance {finding.confidence or 0:.0%})",
+                },
                 timeout=5,
             )
-            if response.ok:
-                blocked.append(finding.source_ip)
-        except requests.RequestException:
-            # Backend unreachable — skip, will retry on next cycle
-            pass
+            response.raise_for_status()
+            blocked.append(finding.source_ip)
+        except requests.RequestException as exc:
+            # Journalise : une erreur avalee en silence rend la panne invisible.
+            logger.warning("Blocage de %s refuse par le backend: %s", finding.source_ip, exc)
 
     return blocked

@@ -28,6 +28,13 @@ ASSETS_INDEX = os.environ.get("ASSETS_INDEX", "netsentinel-assets")
 PROFILE_ASSETS_INDEX = os.environ.get("PROFILE_ASSETS_INDEX", "netsentinel-profile-assets")
 AGENT_TOKENS_INDEX = os.environ.get("AGENT_TOKENS_INDEX", "netsentinel-agent-enrollment-tokens")
 AGENT_INSTANCES_INDEX = os.environ.get("AGENT_INSTANCES_INDEX", "netsentinel-agent-instances")
+IP_BLOCKS_INDEX = os.environ.get("IP_BLOCKS_INDEX", "netsentinel-ip-blocks")
+
+# Reponse automatique : blocage temporaire des IP a l'origine d'une menace
+# critique. La duree limitee est un garde-fou contre les faux positifs.
+AUTO_BLOCK_ENABLED = os.environ.get("AUTO_BLOCK_ENABLED", "true").lower() not in {"0", "false", "no"}
+BLOCK_DURATION_MINUTES = int(os.environ.get("BLOCK_DURATION_MINUTES", "30"))
+BLOCK_EXPIRY_SWEEP_SECONDS = int(os.environ.get("BLOCK_EXPIRY_SWEEP_SECONDS", "60"))
 ADMIN_API_SECRET = os.environ.get("ADMIN_API_SECRET", "netsentinel-admin-dev-secret")
 NETSENTINEL_API_URL = os.environ.get("NETSENTINEL_API_URL", "http://127.0.0.1:8010").rstrip("/")
 

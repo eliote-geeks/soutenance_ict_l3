@@ -1,9 +1,13 @@
+import asyncio
+import logging
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from .scope import aggregate_scope_traffic
+
+logger = logging.getLogger("netsentinel.backend")
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.responses import PlainTextResponse
@@ -45,6 +49,7 @@ from .config import (
     AGENT_TOKENS_INDEX,
     allowed_origins,
     ASSETS_INDEX,
+    BLOCK_EXPIRY_SWEEP_SECONDS,
     ELASTICSEARCH_URL,
     INGEST_AI_ALERTS_INDEX,
     NETSENTINEL_API_URL,
@@ -89,6 +94,14 @@ from .schemas import (
     ProfileCreateRequest,
     ReportExportRequest,
     TicketRequest,
+    UnblockIPRequest,
+)
+from .firewall import (
+    enforce_block,
+    ensure_blocks_index,
+    expire_due_blocks,
+    list_blocks,
+    release_block,
 )
 from .utils import iso, now_utc, normalize_text, parse_dt, percent_change
 from .ns_storage import storage_configured, storage_health
@@ -105,6 +118,30 @@ class ChatbotRequest(BaseModel):
 
 app = FastAPI(title="NetSentinel AI API", version="0.1.0")
 api_router = APIRouter(prefix="/api")
+
+
+@app.on_event("startup")
+async def start_block_expiry_sweeper():
+    """
+    Leve periodiquement les blocages arrives a expiration.
+
+    Sans cette boucle, un blocage decide sur un faux positif resterait en
+    place indefiniment : l'expiration automatique est le garde-fou qui rend
+    la reponse automatique acceptable.
+    """
+    ensure_blocks_index()
+
+    async def sweep():
+        while True:
+            await asyncio.sleep(BLOCK_EXPIRY_SWEEP_SECONDS)
+            try:
+                released = await asyncio.to_thread(expire_due_blocks)
+                if released:
+                    logger.info("Blocages expires leves: %s", ", ".join(released))
+            except Exception:
+                logger.exception("Echec de la levee des blocages expires")
+
+    asyncio.create_task(sweep())
 AGENT_BUNDLE_DIR = Path(__file__).resolve().parent.parent / "agent"
 AGENT_SOURCE_FILES = {
     "install-linux.sh": AGENT_BUNDLE_DIR / "install-linux.sh",
@@ -747,8 +784,34 @@ async def isolate_host(host_id: str):
 
 @api_router.post("/firewall/block")
 async def block_ip(request: BlockIPRequest):
+    """
+    Bloque une IP sur la machine attaquee, via l'agent qui y est installe.
+
+    `enforced` dit la verite : il ne vaut True que si un agent a reellement
+    recu l'ordre de poser la regle iptables. Sans agent, le blocage est
+    enregistre mais annonce comme non applique.
+    """
+    result = enforce_block(
+        request.ip,
+        hostname=request.hostname,
+        reason=request.reason,
+        duration_minutes=request.duration_minutes,
+    )
     BLOCKED_IPS.add(request.ip)
-    return {"success": True, "ip": request.ip}
+    return {"success": result.get("status") in {"enforced", "pending"}, **result}
+
+
+@api_router.post("/firewall/unblock")
+async def unblock_ip(request: UnblockIPRequest):
+    result = release_block(request.ip, reason=request.reason)
+    BLOCKED_IPS.discard(request.ip)
+    return {"success": result.get("status") == "released", **result}
+
+
+@api_router.get("/firewall/blocks")
+async def firewall_blocks(active_only: bool = False):
+    blocks = list_blocks(active_only=active_only)
+    return {"blocks": blocks, "total": len(blocks)}
 
 
 @api_router.post("/tickets")

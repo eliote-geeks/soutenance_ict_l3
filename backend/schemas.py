@@ -5,6 +5,16 @@ from pydantic import BaseModel
 
 class BlockIPRequest(BaseModel):
     ip: str
+    # Machine attaquee : c'est son agent qui posera la regle iptables.
+    hostname: str | None = None
+    reason: str | None = None
+    # Duree du blocage. Laisser vide applique BLOCK_DURATION_MINUTES.
+    duration_minutes: int | None = None
+
+
+class UnblockIPRequest(BaseModel):
+    ip: str
+    reason: str | None = None
 
 
 class TicketRequest(BaseModel):
