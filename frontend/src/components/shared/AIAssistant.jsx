@@ -283,7 +283,7 @@ Chaque page de l'app possède aussi un bouton **?** (bas droite) qui ouvre un pa
 
 **Clés principales :**
 \`\`\`
-ELASTICSEARCH_URL=http://IP:9201
+ELASTICSEARCH_URL=http://IP:9200
 ELASTICSEARCH_USERNAME=elastic
 ELASTICSEARCH_PASSWORD=<mot_de_passe>
 ELASTICSEARCH_API_KEY=          ← alternative au user/pass

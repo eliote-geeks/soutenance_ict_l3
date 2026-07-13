@@ -417,7 +417,7 @@ const SECTIONS = [
         title: 'Contenu complet du fichier backend/.env',
         language: 'env',
         code: `# ── Elasticsearch ──────────────────────────────────────────────
-ELASTICSEARCH_URL=http://79.137.32.27:9201
+ELASTICSEARCH_URL=http://79.137.32.27:9200
 ELASTICSEARCH_USERNAME=elastic
 ELASTICSEARCH_PASSWORD=<votre_mot_de_passe>
 ELASTICSEARCH_API_KEY=                        # Laisser vide si user/pass utilisé
@@ -451,7 +451,7 @@ TELEMETRY_JSON_PATH=./state/telemetry.json`,
         type: 'config',
         title: 'Référence de toutes les clés',
         items: [
-          { key: 'ELASTICSEARCH_URL',           desc: 'URL complète du cluster ES. http ou https, avec le port (9200 par défaut, 9201 ici).' },
+          { key: 'ELASTICSEARCH_URL',           desc: 'URL complète du cluster ES. http ou https, avec le port (9200 par défaut).' },
           { key: 'ELASTICSEARCH_USERNAME',      desc: 'Nom d\'utilisateur Elasticsearch. Valeur par défaut : elastic.' },
           { key: 'ELASTICSEARCH_PASSWORD',      desc: 'Mot de passe Elasticsearch. Généré à l\'installation ou défini dans kibana.' },
           { key: 'ELASTICSEARCH_API_KEY',       desc: 'Clé API ES (base64). Alternative au couple user/password. Laisser vide si non utilisée.' },

@@ -131,7 +131,7 @@ Mode direct encore supporte:
 
 ```bash
 sudo bash install-linux.sh \
-  --elastic-url http://79.137.32.27:9201 \
+  --elastic-url http://79.137.32.27:9200 \
   --username elastic \
   --password changeme \
   --site yaounde-lab \
@@ -157,7 +157,7 @@ Mode direct:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install-windows.ps1 `
-  -ElasticUrl "http://79.137.32.27:9201" `
+  -ElasticUrl "http://79.137.32.27:9200" `
   -Username "elastic" `
   -Password "changeme" `
   -Site "yaounde-lab" `

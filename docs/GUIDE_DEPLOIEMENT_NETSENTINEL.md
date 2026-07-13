@@ -293,7 +293,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/netsentinel/backend
-Environment="ELASTICSEARCH_URL=http://127.0.0.1:9201"
+Environment="ELASTICSEARCH_URL=http://127.0.0.1:9200"
 ExecStart=/opt/netsentinel/.venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8010
 Restart=always
 User=ubuntu
@@ -311,7 +311,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/netsentinel/ai-engine
-Environment="ELASTICSEARCH_URL=http://127.0.0.1:9201"
+Environment="ELASTICSEARCH_URL=http://127.0.0.1:9200"
 Environment="NETSENTINEL_BACKEND_URL=http://127.0.0.1:8010"
 ExecStart=/opt/netsentinel/.venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 9000
 Restart=always
