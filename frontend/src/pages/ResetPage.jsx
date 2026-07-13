@@ -7,9 +7,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getBackendBaseUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const BACKEND   = 'http://127.0.0.1:8010';
 const CONFIRM_WORD = 'RESET';
 
 /* ─── Step indicator ─────────────────────────────────────────────────────── */
@@ -200,7 +200,7 @@ function Step3({ onNext, onBack }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${BACKEND}/api/setup/reset`, {
+      const res = await fetch(`${getBackendBaseUrl()}/api/setup/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ admin_secret: secret, dry_run: true }),
@@ -282,7 +282,7 @@ function Step4({ adminSecret, onBack }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${BACKEND}/api/setup/reset`, {
+      const res = await fetch(`${getBackendBaseUrl()}/api/setup/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ admin_secret: adminSecret }),
@@ -400,7 +400,7 @@ export default function ResetPage() {
 
   const loadConfig = async () => {
     try {
-      const res  = await fetch(`${BACKEND}/api/setup/current-config`);
+      const res  = await fetch(`${getBackendBaseUrl()}/api/setup/current-config`);
       const data = await res.json();
       setConfig(data.lines || []);
     } catch {

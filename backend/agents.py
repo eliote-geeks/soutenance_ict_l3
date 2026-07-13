@@ -5,7 +5,6 @@ from typing import Any
 from fastapi import HTTPException
 
 from .config import (
-    ADMIN_API_SECRET,
     AGENT_INSTANCES_INDEX,
     AGENT_TOKENS_INDEX,
     ASSETS_INDEX,
@@ -21,6 +20,7 @@ from .config import (
     PACKETBEAT_INDEX,
     METRICBEAT_INDEX,
     NETSENTINEL_API_URL,
+    current_admin_api_secret,
 )
 from .data import DEFAULT_ASSETS, DEFAULT_PROFILE_ASSETS
 from .elastic import (
@@ -41,7 +41,7 @@ def hash_agent_token(token: str) -> str:
 
 
 def assert_admin_secret(secret: str | None, _request: Any = None) -> None:
-    if secret != ADMIN_API_SECRET:
+    if secret != current_admin_api_secret():
         raise HTTPException(status_code=401, detail="Invalid or missing admin secret")
 
 
@@ -104,6 +104,8 @@ def agent_elastic_auth_payload() -> dict[str, Any]:
         payload["password"] = ELASTICSEARCH_PASSWORD
         payload["auth_mode"] = "basic"
         payload["allow_basic_auth"] = True
+    elif ELASTICSEARCH_URL:
+        payload["auth_mode"] = "none"
     else:
         payload["auth_mode"] = "missing"
     return payload

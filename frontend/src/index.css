@@ -161,6 +161,150 @@
 }
 
 @layer components {
+  .launch-intro {
+    @apply fixed inset-0 z-[100] overflow-hidden;
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+
+  .launch-intro--closing {
+    animation: fadeOut 0.4s ease-in forwards;
+  }
+
+  .launch-intro__backdrop {
+    @apply absolute inset-0;
+    background:
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.2), transparent 34%),
+      radial-gradient(circle at bottom right, hsl(var(--warning) / 0.18), transparent 24%),
+      linear-gradient(135deg, hsl(var(--ink)) 0%, hsl(220 22% 11%) 55%, hsl(190 40% 10%) 100%);
+  }
+
+  .launch-intro__grid {
+    @apply absolute inset-0 opacity-60;
+  }
+
+  .launch-intro__shell {
+    @apply relative z-10 flex min-h-screen items-center justify-center px-4 py-10 sm:px-6;
+  }
+
+  .launch-intro__brand {
+    @apply mb-6 flex items-center gap-4 text-white sm:mb-8;
+  }
+
+  .launch-intro__mark {
+    @apply flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-primary-foreground;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-glow)) 100%);
+  }
+
+  .launch-intro__eyebrow {
+    @apply mb-1 text-xs font-semibold uppercase tracking-[0.28em] text-white/60;
+  }
+
+  .launch-intro__title {
+    @apply max-w-xl text-2xl font-semibold leading-tight text-white sm:text-4xl;
+  }
+
+  .launch-intro__panel {
+    @apply relative mx-auto w-full max-w-5xl rounded-[2rem] border border-white/10 p-5 sm:p-8;
+    background: linear-gradient(180deg, hsl(220 26% 16% / 0.78), hsl(215 26% 11% / 0.92));
+  }
+
+  .launch-intro__status {
+    @apply mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary-light;
+  }
+
+  .launch-intro__status-dot {
+    @apply h-2.5 w-2.5 rounded-full bg-primary;
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.55);
+    animation: introPulse 1.8s infinite;
+  }
+
+  .launch-intro__hero {
+    @apply grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center;
+  }
+
+  .launch-intro__copy h2 {
+    @apply mb-3 text-3xl font-semibold leading-tight text-white sm:text-4xl;
+  }
+
+  .launch-intro__copy p {
+    @apply max-w-xl text-sm leading-7 text-white/70 sm:text-base;
+  }
+
+  .launch-intro__step-tag {
+    @apply mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/60;
+  }
+
+  .launch-intro__signal {
+    @apply relative mx-auto flex h-[260px] w-[260px] items-center justify-center sm:h-[320px] sm:w-[320px];
+  }
+
+  .launch-intro__signal-core {
+    @apply relative z-10 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-primary/20 text-primary-foreground sm:h-28 sm:w-28;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-glow)) 100%);
+    box-shadow: 0 18px 60px hsl(var(--primary) / 0.4);
+    animation: introFloat 4s ease-in-out infinite;
+  }
+
+  .launch-intro__ring {
+    @apply absolute rounded-full border;
+    border-color: hsl(var(--primary) / 0.18);
+  }
+
+  .launch-intro__ring--one {
+    @apply h-40 w-40 sm:h-48 sm:w-48;
+    animation: introRadar 2.8s ease-out infinite;
+  }
+
+  .launch-intro__ring--two {
+    @apply h-56 w-56 sm:h-64 sm:w-64;
+    animation: introRadar 2.8s ease-out 0.5s infinite;
+  }
+
+  .launch-intro__ring--three {
+    @apply h-72 w-72 sm:h-80 sm:w-80;
+    animation: introRadar 2.8s ease-out 1s infinite;
+  }
+
+  .launch-intro__cards {
+    @apply mt-8 grid gap-3 lg:grid-cols-3;
+  }
+
+  .launch-intro__card {
+    @apply flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-white/60 transition-all duration-300;
+  }
+
+  .launch-intro__card strong {
+    @apply mb-1 block text-sm font-semibold text-white/90;
+  }
+
+  .launch-intro__card span {
+    @apply block text-xs leading-5;
+  }
+
+  .launch-intro__card.is-active {
+    @apply border-primary/20 bg-primary/10 text-white;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px hsl(var(--primary) / 0.16);
+  }
+
+  .launch-intro__footer {
+    @apply mt-8 flex flex-col gap-4 sm:flex-row sm:items-center;
+  }
+
+  .launch-intro__progress {
+    @apply h-2 flex-1 overflow-hidden rounded-full bg-white/10;
+  }
+
+  .launch-intro__progress-bar {
+    @apply h-full rounded-full;
+    background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--warning)) 100%);
+    transition: width 0.12s linear;
+  }
+
+  .launch-intro__cta {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-foreground transition-all duration-200 hover:scale-[1.02] hover:bg-primary-light;
+  }
+
   /* Glass Panel Effect */
   .glass-panel {
     @apply relative overflow-hidden;
@@ -388,6 +532,11 @@
   to { opacity: 1; }
 }
 
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+
 @keyframes slideUp {
   from { 
     opacity: 0; 
@@ -433,6 +582,41 @@
 @keyframes counter {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes introRadar {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes introFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes introPulse {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px hsl(var(--primary) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
 }
 
 /* Debug wrapper fix */

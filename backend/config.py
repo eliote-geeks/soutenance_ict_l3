@@ -32,6 +32,10 @@ ADMIN_API_SECRET = os.environ.get("ADMIN_API_SECRET", "netsentinel-admin-dev-sec
 NETSENTINEL_API_URL = os.environ.get("NETSENTINEL_API_URL", "http://127.0.0.1:8010").rstrip("/")
 
 
+def current_admin_api_secret() -> str:
+    return os.environ.get("ADMIN_API_SECRET", ADMIN_API_SECRET)
+
+
 def allowed_origins() -> list[str]:
     configured = [origin.strip() for origin in os.environ.get("CORS_ORIGINS", "").split(",") if origin.strip()]
     defaults = ["http://localhost:3000", "http://127.0.0.1:3000"]

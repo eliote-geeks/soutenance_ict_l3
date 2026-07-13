@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { getBackendBaseUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { PresentationSlides } from '@/components/shared/PresentationSlides';
 
 /* ─── Steps config ───────────────────────────────────────────────────────── */
 const STEPS = [
@@ -20,8 +22,6 @@ const STEPS = [
   { id: 'indices',  label: 'Index Patterns',      icon: Layers   },
   { id: 'summary',  label: 'Récapitulatif',        icon: CheckCircle },
 ];
-
-const BACKEND = 'http://127.0.0.1:8010';
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 function generateSecret(len = 32) {
@@ -59,43 +59,21 @@ function TipBox({ type = 'info', text }) {
 
 function StepWelcome({ onNext }) {
   return (
-    <div className="space-y-8 text-center">
+    <div className="space-y-8">
       <div className="flex justify-center">
-        <div className="w-24 h-24 rounded-3xl bg-primary/15 border border-primary/30 flex items-center justify-center shadow-lg">
-          <Shield className="w-12 h-12 text-primary" />
+        <PresentationSlides />
+      </div>
+
+      <div className="space-y-4">
+        <TipBox type="info" text="La configuration sera sauvegardee dans backend/.env. Vous pourrez la modifier ensuite sans changer la logique de deploiement de l application." />
+
+        <div className="flex justify-center">
+          <Button size="lg" className="gap-2 px-8" onClick={onNext}>
+            Demarrer la configuration
+            <ChevronRight className="w-4 h-4" />
+          </Button>
         </div>
       </div>
-
-      <div>
-        <Badge variant="outline" className="text-primary border-primary/30 mb-3">Premier démarrage</Badge>
-        <h1 className="text-3xl font-bold text-foreground">
-          Bienvenue sur <span className="text-primary">NetSentinel AI</span>
-        </h1>
-        <p className="text-muted-foreground mt-3 max-w-md mx-auto leading-relaxed">
-          Avant de commencer, configurons la plateforme en quelques étapes rapides.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-        {[
-          { icon: Database, title: 'Elasticsearch', desc: 'Connectez votre cluster de stockage des logs et alertes.' },
-          { icon: Lock,     title: 'Sécurité',      desc: 'Définissez le secret admin et les origines autorisées.' },
-          { icon: Layers,   title: 'Index Patterns', desc: 'Vérifiez les patterns d\'index Beats (filebeat-*, etc.).' },
-        ].map((item, i) => (
-          <div key={i} className="p-4 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors">
-            <item.icon className="w-5 h-5 text-primary mb-2" />
-            <p className="text-sm font-semibold text-foreground">{item.title}</p>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.desc}</p>
-          </div>
-        ))}
-      </div>
-
-      <TipBox type="info" text="La configuration sera sauvegardée dans backend/.env. Vous pourrez la modifier à tout moment depuis ce fichier ou en relançant ce wizard depuis les paramètres." />
-
-      <Button size="lg" className="gap-2 px-8" onClick={onNext}>
-        Commencer la configuration
-        <ChevronRight className="w-4 h-4" />
-      </Button>
     </div>
   );
 }
@@ -109,7 +87,8 @@ function StepElastic({ values, onChange, onNext, onBack }) {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch(`${BACKEND}/api/setup/test-connection`, {
+      const backend = getBackendBaseUrl();
+      const res = await fetch(`${backend}/api/setup/test-connection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -310,7 +289,7 @@ function StepSecurity({ values, onChange, onNext, onBack }) {
 
         <Field label="URL publique du backend (NETSENTINEL_API_URL)" hint="Incluse dans les commandes d'installation des agents. Doit être accessible depuis les machines cibles.">
           <Input
-            placeholder="http://127.0.0.1:8010"
+            placeholder={getBackendBaseUrl()}
             value={values.netsentinel_api_url}
             onChange={e => onChange('netsentinel_api_url', e.target.value)}
           />
@@ -460,6 +439,7 @@ function StepSummary({ values, onBack, onFinish, finishing, error }) {
 /* ─── Main wizard ────────────────────────────────────────────────────────── */
 export default function SetupPage() {
   const navigate = useNavigate();
+  const backend = getBackendBaseUrl();
   const [step, setStep] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState(null);
@@ -473,7 +453,7 @@ export default function SetupPage() {
     elasticsearch_verify_tls: false,
     admin_api_secret: generateSecret(32),
     cors_origins: 'http://localhost:3000',
-    netsentinel_api_url: 'http://127.0.0.1:8010',
+    netsentinel_api_url: backend,
     ai_service_url: 'http://127.0.0.1:9000',
     filebeat_index: 'filebeat-*',
     packetbeat_index: 'packetbeat-*',
@@ -489,7 +469,7 @@ export default function SetupPage() {
     setFinishing(true);
     setFinishError(null);
     try {
-      const res = await fetch(`${BACKEND}/api/setup/complete`, {
+      const res = await fetch(`${backend}/api/setup/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -512,7 +492,7 @@ export default function SetupPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-2xl">
+      <div className={cn('w-full', step === 0 ? 'max-w-5xl' : 'max-w-2xl')}>
 
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-8">
@@ -548,7 +528,10 @@ export default function SetupPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-2xl shadow-2xl p-8">
+        <div className={cn(
+          'bg-card border border-border rounded-2xl shadow-2xl',
+          step === 0 ? 'p-6 md:p-8' : 'p-8',
+        )}>
           {step === 0 && <StepWelcome  onNext={next} />}
           {step === 1 && <StepElastic  values={values} onChange={set} onNext={next} onBack={back} />}
           {step === 2 && <StepSecurity values={values} onChange={set} onNext={next} onBack={back} />}

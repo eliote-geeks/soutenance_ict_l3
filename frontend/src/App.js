@@ -8,6 +8,7 @@ import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
 import { Toaster } from '@/components/ui/sonner';
 import AIAssistant from '@/components/shared/AIAssistant';
 import SetupPage from '@/pages/SetupPage';
+import { getApiBaseUrl } from '@/lib/api';
 
 // ─── Active pages ────────────────────────────────────────────────────────────
 import OverviewPage      from '@/pages/OverviewPage';
@@ -35,14 +36,12 @@ import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage';
 // ProfilePage      → removed: no backend-backed profile data
 // SettingsPage     → no backend for settings
 
-const BACKEND = 'http://127.0.0.1:8010';
-
 function SetupGuard({ children }) {
   const [checked, setChecked] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
-    fetch(`${BACKEND}/api/setup/status`)
+    fetch(`${getApiBaseUrl()}/setup/status`)
       .then(r => r.json())
       .then(d => { setNeedsSetup(!d.configured); setChecked(true); })
       .catch(() => setChecked(true)); // backend unreachable → skip guard, show normal app

@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Bot,
   Copy,
+  Download,
   KeyRound,
   Laptop,
   RefreshCw,
@@ -44,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
   authenticateAdminSession,
@@ -53,6 +55,7 @@ import {
   fetchAgentInstances,
   fetchAssets,
   fetchEnrollmentTokens,
+  getBackendBaseUrl,
   rejectAgentInstance,
   revokeEnrollmentToken,
 } from '@/lib/api';
@@ -83,8 +86,55 @@ const relativeTime = (value) => {
   return `${Math.floor(minutes / 1440)}d ago`;
 };
 
+const downloadTextFile = (content, filename) => {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+const buildLinuxBootstrap = ({ apiUrl, token }) => `#!/usr/bin/env bash
+set -euo pipefail
+
+API_URL="${apiUrl}"
+ENROLLMENT_TOKEN="${token}"
+TMP_DIR="$(mktemp -d)"
+INSTALL_URL="$API_URL/api/agent/installers/source/install-linux.sh"
+RUNTIME_URL="$API_URL/api/agent/installers/source/ns_agent_runtime.py"
+
+cleanup() {
+  rm -rf "$TMP_DIR"
+}
+
+trap cleanup EXIT
+
+curl -fsSL "$INSTALL_URL" -o "$TMP_DIR/install-linux.sh"
+curl -fsSL "$RUNTIME_URL" -o "$TMP_DIR/ns_agent_runtime.py"
+
+if [[ "\${EUID:-$(id -u)}" -ne 0 ]]; then
+  exec sudo bash "$TMP_DIR/install-linux.sh" --api-url "$API_URL" --enrollment-token "$ENROLLMENT_TOKEN" "$@"
+fi
+
+exec bash "$TMP_DIR/install-linux.sh" --api-url "$API_URL" --enrollment-token "$ENROLLMENT_TOKEN" "$@"
+`;
+
+const buildWindowsBootstrap = ({ apiUrl, token }) => `$ErrorActionPreference = "Stop"
+$ApiUrl = "${apiUrl}"
+$EnrollmentToken = "${token}"
+$Dir = Join-Path $env:TEMP "netsentinel-agent"
+
+New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+Invoke-WebRequest "$ApiUrl/api/agent/installers/source/install-windows.ps1" -OutFile "$Dir\\install-windows.ps1"
+Invoke-WebRequest "$ApiUrl/api/agent/installers/source/runtime-windows.ps1" -OutFile "$Dir\\runtime-windows.ps1"
+powershell -ExecutionPolicy Bypass -File "$Dir\\install-windows.ps1" -ApiUrl $ApiUrl -EnrollmentToken $EnrollmentToken
+`;
+
 export default function AgentsPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = user?.role === 'admin';
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -99,6 +149,8 @@ export default function AgentsPage() {
   const [adminAuthError, setAdminAuthError] = useState('');
   const [adminAuthSubmitting, setAdminAuthSubmitting] = useState(false);
   const adminAuthResolver = useRef(null);
+  const requestedAssetId = searchParams.get('asset_id') || '';
+  const openCreateDialog = searchParams.get('create') === '1';
 
   const ensureAdminSession = async () => {
     if (adminAuthResolver.current) {
@@ -130,18 +182,18 @@ export default function AgentsPage() {
       return;
     }
     try {
-      const [assetsResult, instancesResult, tokensResult] = await runAdminRequest(() => Promise.all([
-          fetchAssets(),
-          fetchAgentInstances(),
-          fetchEnrollmentTokens(),
-        ]));
+      const assetsResult = await fetchAssets();
       setAssets(assetsResult.assets || []);
-      setInstances(instancesResult.instances || []);
-      setTokens(tokensResult.tokens || []);
       setForm((prev) => ({
         ...prev,
-        asset_id: prev.asset_id || assetsResult.assets?.[0]?.id || '',
+        asset_id: requestedAssetId || prev.asset_id || assetsResult.assets?.[0]?.id || '',
       }));
+      const [instancesResult, tokensResult] = await runAdminRequest(() => Promise.all([
+        fetchAgentInstances(),
+        fetchEnrollmentTokens(),
+      ]));
+      setInstances(instancesResult.instances || []);
+      setTokens(tokensResult.tokens || []);
     } catch (error) {
       toast.error('Unable to load agent administration.', {
         description: error.message,
@@ -155,6 +207,13 @@ export default function AgentsPage() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin || !openCreateDialog) {
+      return;
+    }
+    setOpen(true);
+  }, [isAdmin, openCreateDialog]);
 
   const pendingInstances = useMemo(
     () => instances.filter((instance) => instance.status === 'pending_approval'),
@@ -177,6 +236,24 @@ export default function AgentsPage() {
     }
   };
 
+  const handleDownloadInstaller = (platform, token) => {
+    const apiUrl = getBackendBaseUrl();
+    const safeAssetId = (token.asset_id || 'asset').replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (platform === 'linux') {
+      downloadTextFile(
+        buildLinuxBootstrap({ apiUrl, token: token.raw_token }),
+        `netsentinel-install-${safeAssetId}.sh`,
+      );
+      toast.success('Linux installer downloaded.');
+      return;
+    }
+    downloadTextFile(
+      buildWindowsBootstrap({ apiUrl, token: token.raw_token }),
+      `netsentinel-install-${safeAssetId}.ps1`,
+    );
+    toast.success('Windows installer downloaded.');
+  };
+
   const handleCreateToken = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -194,6 +271,11 @@ export default function AgentsPage() {
         description: `Token for ${result.token.asset_id} ready to distribute.`,
       });
       await handleCopy(result.token.raw_token, 'Enrollment token');
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('create');
+        return next;
+      });
       await loadData();
     } catch (error) {
       toast.error('Unable to create enrollment token.', {
@@ -418,7 +500,7 @@ export default function AgentsPage() {
       </div>
 
       {latestToken && (() => {
-        const apiUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8010';
+        const apiUrl = getBackendBaseUrl();
         const linuxCmd = `sudo bash install-linux.sh \\\n  --api-url ${apiUrl} \\\n  --enrollment-token ${latestToken.raw_token}`;
         const winCmd = `.\\install-windows.ps1 \`\n  -ApiUrl ${apiUrl} \`\n  -EnrollmentToken ${latestToken.raw_token}`;
         return (
@@ -429,7 +511,7 @@ export default function AgentsPage() {
                 Enrollment token — {latestToken.asset_id}
               </CardTitle>
               <CardDescription>
-                Token valid until {formatDateTime(latestToken.expires_at)}. Run the command below on the target machine from inside the <code className="font-mono">agent/</code> directory. The token is automatically copied to the clipboard.
+                Token valid until {formatDateTime(latestToken.expires_at)}. Download a preconfigured installer or run the command manually. The token is automatically copied to the clipboard.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -445,6 +527,16 @@ export default function AgentsPage() {
 
               {/* Install commands */}
               <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="default" size="sm" onClick={() => handleDownloadInstaller('linux', latestToken)}>
+                    <Download className="h-4 w-4" />
+                    Download Linux installer
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDownloadInstaller('windows', latestToken)}>
+                    <Download className="h-4 w-4" />
+                    Download Windows installer
+                  </Button>
+                </div>
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Terminal className="h-4 w-4 text-primary" />
                   Install command

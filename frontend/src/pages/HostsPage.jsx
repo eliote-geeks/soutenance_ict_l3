@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Server, Search, Shield, AlertTriangle, Wifi, WifiOff, Download, Plus } from 'lucide-react';
 import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +41,7 @@ import { toast } from 'sonner';
 const EMPTY_ASSET_FORM = { hostname: '', ip: '', os: 'Linux', role: 'Server', site: 'default-site' };
 
 export default function HostsPage() {
+  const navigate = useNavigate();
   const { scopeKey } = useScope();
   const [hosts, setHosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -134,12 +136,15 @@ export default function HostsPage() {
     try {
       const id = `asset_${assetForm.hostname.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
       await createAsset({ id, ...assetForm });
-      toast.success('Asset registered', { description: `${assetForm.hostname} added — go to Agents to create an enrollment token.` });
+      toast.success('Asset registered', { description: `${assetForm.hostname} added — continuing to agent enrollment.` });
       setAddDialogOpen(false);
       setAssetForm(EMPTY_ASSET_FORM);
       await loadData();
+      navigate(`/agents?asset_id=${encodeURIComponent(id)}&create=1`);
     } catch (error) {
-      toast.error('Failed to register asset');
+      toast.error('Failed to register asset', {
+        description: error.message,
+      });
     } finally {
       setSubmitting(false);
     }

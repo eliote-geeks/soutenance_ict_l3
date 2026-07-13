@@ -121,14 +121,17 @@ check_http_reachable() {
 }
 
 validate_elastic_credentials() {
+  if [[ -z "$ELASTIC_URL" ]]; then
+    echo "Elastic URL is required." >&2
+    exit 1
+  fi
   if [[ -n "$API_KEY" ]]; then
     return
   fi
   if [[ -n "$USERNAME" && -n "$PASSWORD" && "$ALLOW_BASIC_AUTH" == "true" ]]; then
     return
   fi
-  echo "Elastic API key is required. Basic auth is blocked unless NETSENTINEL_ALLOW_BASIC_AUTH=true." >&2
-  exit 1
+  return
 }
 
 preflight_common() {
@@ -185,13 +188,16 @@ mkdir -p "$STATE_DIR"
 chmod 700 "$STATE_DIR"
 
 install_beats() {
-  apt-get update
+  apt-get update || true
   apt-get install -y curl gnupg apt-transport-https python3
   rm -f /usr/share/keyrings/elastic-keyring.gpg
   curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elastic-keyring.gpg
   chmod 0644 /usr/share/keyrings/elastic-keyring.gpg
   echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" > /etc/apt/sources.list.d/elastic-8.x.list
-  apt-get update
+  apt-get update \
+    -o Dir::Etc::sourcelist='sources.list.d/elastic-8.x.list' \
+    -o Dir::Etc::sourceparts='-' \
+    -o APT::Get::List-Cleanup='0'
   apt-get install -y filebeat packetbeat metricbeat
 }
 
@@ -211,12 +217,18 @@ output.elasticsearch:
   api_key: "$API_KEY"
 $(write_ssl_block)
 EOF
-  else
+  elif [[ -n "$USERNAME" && -n "$PASSWORD" ]]; then
     cat <<EOF
 output.elasticsearch:
   hosts: ["$ELASTIC_URL"]
   username: "$USERNAME"
   password: "$PASSWORD"
+$(write_ssl_block)
+EOF
+  else
+    cat <<EOF
+output.elasticsearch:
+  hosts: ["$ELASTIC_URL"]
 $(write_ssl_block)
 EOF
   fi

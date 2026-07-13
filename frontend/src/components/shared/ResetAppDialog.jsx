@@ -8,9 +8,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getBackendBaseUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
-
-const BACKEND = 'http://127.0.0.1:8010';
 
 /* ─── Step indicator pill ─────────────────────────────────────────────────── */
 function StepDot({ n, current, done }) {
@@ -224,7 +223,7 @@ function Step3Auth({ onNext, onBack, onClose }) {
     setError('');
     try {
       // Dry-run: call reset with a flag — we just verify the secret is accepted
-      const res = await fetch(`${BACKEND}/api/setup/reset`, {
+      const res = await fetch(`${getBackendBaseUrl()}/api/setup/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ admin_secret: secret, dry_run: true }),
@@ -329,7 +328,7 @@ function Step4Confirm({ adminSecret, onBack, onClose }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${BACKEND}/api/setup/reset`, {
+      const res = await fetch(`${getBackendBaseUrl()}/api/setup/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ admin_secret: adminSecret }),
@@ -463,7 +462,7 @@ export function ResetAppDialog({ trigger }) {
     setAdminSecret('');
     // Pre-fetch config for step 2 backup display
     try {
-      const res  = await fetch(`${BACKEND}/api/setup/current-config`);
+      const res  = await fetch(`${getBackendBaseUrl()}/api/setup/current-config`);
       const data = await res.json();
       setConfig(data.lines || []);
     } catch {

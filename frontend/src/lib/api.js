@@ -18,14 +18,20 @@ import {
   generateLogs,
 } from './mockData';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8010';
-const API_BASE = `${BACKEND_URL}/api`;
 const SCOPE_STORAGE_KEY = 'netsentinel-scope';
-
 // Simulate network delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const USE_MOCK = process.env.REACT_APP_USE_MOCK === 'true';
+
+export const getBackendBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    return 'http://127.0.0.1:3000';
+  }
+  return window.location.origin;
+};
+
+export const getApiBaseUrl = () => `${getBackendBaseUrl()}/api`;
 
 const getStoredScope = () => {
   if (typeof window === 'undefined') {
@@ -51,15 +57,24 @@ const appendScopeParams = (path) => {
 };
 
 const fetchJson = async (path, options) => {
+  const API_BASE = getApiBaseUrl();
   const scopedPath = appendScopeParams(path);
   const response = await fetch(`${API_BASE}${scopedPath}`, options);
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    let detail = `API request failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      detail = payload.detail || payload.message || detail;
+    } catch (error) {
+      // keep default detail
+    }
+    throw new Error(detail);
   }
   return response.json();
 };
 
 const fetchAdminJson = async (path, options = {}) => {
+  const API_BASE = getApiBaseUrl();
   const secret = getStoredAdminSecret();
   const headers = {
     ...(options.headers || {}),
@@ -91,6 +106,7 @@ const getStoredAdminSecret = () => {
 };
 
 export const authenticateAdminSession = async (secret) => {
+  const API_BASE = getApiBaseUrl();
   const response = await fetch(`${API_BASE}/admin/session`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
@@ -212,6 +228,7 @@ export const fetchScopeOptions = async () => {
     await delay(200);
     return { profiles: [], assets: [], assignments: [] };
   }
+  const API_BASE = getApiBaseUrl();
   const response = await fetch(`${API_BASE}/scope/options`);
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`);

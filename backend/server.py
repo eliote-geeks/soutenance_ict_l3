@@ -1,10 +1,12 @@
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 from .scope import aggregate_scope_traffic
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
+from fastapi.responses import PlainTextResponse
 from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -37,7 +39,6 @@ from .analytics import (
     logs_feed,
 )
 from .config import (
-    ADMIN_API_SECRET,
     AI_ALERTS_INDEX,
     AI_SERVICE_URL,
     AGENT_INSTANCES_INDEX,
@@ -49,6 +50,7 @@ from .config import (
     NETSENTINEL_API_URL,
     PROFILE_ASSETS_INDEX,
     PROFILES_INDEX,
+    current_admin_api_secret,
 )
 from .data import ALERTS, AI_FINDINGS_BUFFER, BLOCKED_IPS, HOSTS, TICKETS
 from .elastic import (
@@ -103,6 +105,18 @@ class ChatbotRequest(BaseModel):
 
 app = FastAPI(title="NetSentinel AI API", version="0.1.0")
 api_router = APIRouter(prefix="/api")
+AGENT_BUNDLE_DIR = Path(__file__).resolve().parent.parent / "agent"
+AGENT_SOURCE_FILES = {
+    "install-linux.sh": AGENT_BUNDLE_DIR / "install-linux.sh",
+    "ns_agent_runtime.py": AGENT_BUNDLE_DIR / "ns_agent_runtime.py",
+    "install-windows.ps1": AGENT_BUNDLE_DIR / "install-windows.ps1",
+    "runtime-windows.ps1": AGENT_BUNDLE_DIR / "runtime-windows.ps1",
+}
+
+
+def require_storage_write(success: bool, message: str) -> None:
+    if storage_configured() and not success:
+        raise HTTPException(status_code=503, detail=message)
 
 
 @app.get("/health")
@@ -142,6 +156,17 @@ async def health():
     }
 
 
+@api_router.get("/agent/installers/source/{filename}", response_class=PlainTextResponse)
+async def agent_installer_source(filename: str):
+    source_path = AGENT_SOURCE_FILES.get(filename)
+    if not source_path or not source_path.exists():
+        raise HTTPException(status_code=404, detail="Installer source not found.")
+    return PlainTextResponse(
+        content=source_path.read_text(encoding="utf-8"),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @api_router.get("/scope/options")
 async def scope_options():
     profiles = fetch_profiles_metadata()
@@ -171,6 +196,7 @@ async def profiles():
 async def create_profile(request: ProfileCreateRequest):
     document = {"id": request.id, "name": request.name, "type": request.type, "description": request.description, "created_at": iso(now_utc())}
     stored = elastic_index_doc(PROFILES_INDEX, request.id, document) if storage_configured() else False
+    require_storage_write(stored, "Unable to persist profile to configured storage.")
     return {"success": stored or not storage_configured(), "profile": document}
 
 
@@ -225,6 +251,7 @@ async def create_asset(request: AssetCreateRequest):
         "created_at": iso(now_utc()),
     }
     stored = elastic_index_doc(ASSETS_INDEX, request.id, document) if storage_configured() else False
+    require_storage_write(stored, "Unable to persist asset to configured storage.")
     return {"success": stored or not storage_configured(), "asset": document}
 
 
@@ -233,6 +260,7 @@ async def assign_profile_asset(request: ProfileAssetCreateRequest):
     link_id = f"{request.profile_id}__{request.asset_id}"
     document = {"id": link_id, "profile_id": request.profile_id, "asset_id": request.asset_id, "created_at": iso(now_utc())}
     stored = elastic_index_doc(PROFILE_ASSETS_INDEX, link_id, document) if storage_configured() else False
+    require_storage_write(stored, "Unable to persist profile/asset assignment to configured storage.")
     return {"success": stored or not storage_configured(), "assignment": document}
 
 
@@ -255,7 +283,8 @@ async def create_agent_enrollment_token(request: AgentEnrollmentTokenCreateReque
         "created_at": iso(now_utc()),
         "expires_at": iso(now_utc() + timedelta(minutes=max(1, request.expires_in_minutes))),
     }
-    elastic_index_doc(AGENT_TOKENS_INDEX, token_id, document)
+    stored = elastic_index_doc(AGENT_TOKENS_INDEX, token_id, document)
+    require_storage_write(stored, "Unable to persist enrollment token to configured storage.")
     return {"success": True, "token": {**document, "raw_token": raw_token}}
 
 
@@ -732,7 +761,7 @@ async def create_ticket(request: TicketRequest):
 @api_router.post("/admin/session")
 async def admin_session(x_admin_secret: str | None = Header(default=None)):
     """Validate the admin secret and confirm the session is open."""
-    if x_admin_secret != ADMIN_API_SECRET:
+    if x_admin_secret != current_admin_api_secret():
         raise HTTPException(status_code=401, detail="Invalid or missing admin secret")
     return {"ok": True}
 

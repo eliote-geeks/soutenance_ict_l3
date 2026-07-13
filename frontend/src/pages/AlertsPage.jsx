@@ -22,6 +22,9 @@ import {
   ArrowRightLeft,
   TrendingUp,
   AlertTriangle,
+  Activity,
+  ListChecks,
+  TimerReset,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,6 +55,7 @@ import {
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
+import { KPICard } from '@/components/shared/KPICard';
 import { fetchAlerts, acknowledgeAlert, isolateHost, blockIP, createTicket } from '@/lib/api';
 import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
@@ -281,6 +285,9 @@ export default function AlertsPage() {
     medium:   alerts.filter(a => a.severity === 'medium').length,
     low:      alerts.filter(a => a.severity === 'low').length,
   };
+  const openCount = alerts.filter(a => ['open', 'new'].includes(a.status)).length;
+  const investigatingCount = alerts.filter(a => a.status === 'investigating').length;
+  const actionRequiredCount = alerts.filter(a => ['critical', 'high'].includes(a.severity) && !['resolved', 'false_positive'].includes(a.status)).length;
 
   const confidenceLabel = (value) =>
     typeof value === 'number' ? `${Math.round(value * 100)}%` : '--';
@@ -306,7 +313,7 @@ export default function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Alerts</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage detections, validate anomalies and apply remediation playbooks
+            Signaux bruts detectes par les regles et l'IA. Objectif : qualifier vite, ouvrir un incident si necessaire, puis agir.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -325,12 +332,38 @@ export default function AlertsPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <KPICard title="A traiter" value={openCount} icon={Bell} variant={openCount ? 'warning' : 'success'} delay={0} />
+        <KPICard title="Critiques / High" value={actionRequiredCount} icon={AlertTriangle} variant={actionRequiredCount ? 'danger' : 'success'} delay={80} />
+        <KPICard title="En investigation" value={investigatingCount} icon={Activity} variant="primary" delay={160} />
+        <KPICard title="Total signaux" value={alerts.length} icon={ListChecks} delay={240} />
+      </div>
+
+      <Card className="border-border/50 shadow-soft bg-muted/20">
+        <CardContent className="py-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold flex items-center gap-2"><Bell className="w-4 h-4 text-warning" />1. Qualifier</div>
+              <p className="text-muted-foreground mt-1">Verifier severite, source IP, hote touche, confiance et tactique MITRE.</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold flex items-center gap-2"><TimerReset className="w-4 h-4 text-primary" />2. Decider</div>
+              <p className="text-muted-foreground mt-1">Acknowledge si reel, sinon faux positif. Plusieurs alertes liees deviennent un incident.</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4 text-success" />3. Contenir</div>
+              <p className="text-muted-foreground mt-1">Bloquer l'IP, isoler l'hote ou creer un ticket selon le niveau de risque.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search alerts..."
+            placeholder="Rechercher IP, host, titre, ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -342,7 +375,7 @@ export default function AlertsPage() {
             <SelectValue placeholder="Severity" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Severities</SelectItem>
+            <SelectItem value="all">Toutes severites</SelectItem>
             <SelectItem value="critical">Critical</SelectItem>
             <SelectItem value="high">High</SelectItem>
             <SelectItem value="medium">Medium</SelectItem>
@@ -355,7 +388,7 @@ export default function AlertsPage() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="all">Tous statuts</SelectItem>
             <SelectItem value="open">Open</SelectItem>
             <SelectItem value="investigating">Investigating</SelectItem>
             <SelectItem value="resolved">Resolved</SelectItem>
@@ -382,8 +415,8 @@ export default function AlertsPage() {
             <SelectValue placeholder="Detection" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="heuristic">Heuristic</SelectItem>
+            <SelectItem value="all">Toutes sources</SelectItem>
+            <SelectItem value="heuristic">Regles</SelectItem>
             <SelectItem value="ml">ML</SelectItem>
           </SelectContent>
         </Select>

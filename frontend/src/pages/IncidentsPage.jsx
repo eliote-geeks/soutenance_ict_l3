@@ -5,7 +5,10 @@ import {
   Clock,
   Target,
   Layers3,
-  Radar
+  Radar,
+  ShieldCheck,
+  GitMerge,
+  Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +16,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
+import { KPICard } from '@/components/shared/KPICard';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { fetchIncidents } from '@/lib/api';
 import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
@@ -71,6 +76,10 @@ export default function IncidentsPage() {
   const scopeLabel = (scopeType) => (
     scopeType === 'campaign' ? 'Campaign' : 'Single source'
   );
+  const activeCount = incidents.filter(i => ['active', 'investigating', 'open'].includes(i.status)).length;
+  const criticalCount = incidents.filter(i => ['critical', 'high'].includes(i.severity)).length;
+  const totalAlerts = incidents.reduce((sum, item) => sum + Number(item.alertCount || 0), 0);
+  const totalHosts = incidents.reduce((sum, item) => sum + Number(item.affectedHosts || 0), 0);
 
   if (loading) {
     return (
@@ -90,7 +99,7 @@ export default function IncidentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Incidents</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Group alerts into incidents and track containment decisions
+            Dossiers d'investigation construits a partir d'alertes liees. Objectif : comprendre l'attaque complete, pas juste une alerte isolee.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -100,6 +109,36 @@ export default function IncidentsPage() {
           </Badge>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <KPICard title="Dossiers actifs" value={activeCount} icon={AlertTriangle} variant={activeCount ? 'warning' : 'success'} delay={0} />
+        <KPICard title="Priorite haute" value={criticalCount} icon={ShieldCheck} variant={criticalCount ? 'danger' : 'success'} delay={80} />
+        <KPICard title="Alertes groupees" value={totalAlerts} icon={GitMerge} variant="primary" delay={160} />
+        <KPICard title="Hosts touches" value={totalHosts} icon={Users} delay={240} />
+      </div>
+
+      <Card className="border-border/50 shadow-soft bg-muted/20">
+        <CardContent className="py-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold">1. Declencheur</div>
+              <p className="text-muted-foreground mt-1">Quelle alerte a lance le dossier ? Source, host, signature.</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold">2. Correlation</div>
+              <p className="text-muted-foreground mt-1">Alertes similaires, meme IP, meme host ou meme tactique MITRE.</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold">3. Impact</div>
+              <p className="text-muted-foreground mt-1">Nombre d'hotes touches et criticite du perimetre.</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold">4. Containment</div>
+              <p className="text-muted-foreground mt-1">Action attendue : bloquer, isoler, surveiller ou escalader.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Incidents List */}
@@ -112,6 +151,13 @@ export default function IncidentsPage() {
           <CardContent className="p-0">
             <ScrollArea className="h-[600px]">
               <div className="divide-y divide-border">
+                {incidents.length === 0 && (
+                  <EmptyState
+                    icon={ShieldCheck}
+                    title="Aucun incident actif"
+                    description="Les incidents apparaitront ici quand plusieurs alertes seront correlees ou quand une alerte critique demandera une investigation."
+                  />
+                )}
                 {incidents.map((incident, index) => (
                   <div
                     key={incident.id}
@@ -177,19 +223,19 @@ export default function IncidentsPage() {
                 
                 <div className="grid grid-cols-4 gap-4 mt-6">
                   <div>
-                    <span className="text-xs text-muted-foreground">Alerts</span>
+                    <span className="text-xs text-muted-foreground">Alertes liees</span>
                     <p className="text-lg font-bold font-mono">{selectedIncident.alertCount}</p>
                   </div>
                   <div>
-                    <span className="text-xs text-muted-foreground">Affected Hosts</span>
+                    <span className="text-xs text-muted-foreground">Hosts touches</span>
                     <p className="text-lg font-bold font-mono">{selectedIncident.affectedHosts}</p>
                   </div>
                   <div>
-                    <span className="text-xs text-muted-foreground">Assignee</span>
+                    <span className="text-xs text-muted-foreground">Responsable</span>
                     <p className="text-sm font-medium">{selectedIncident.assignee}</p>
                   </div>
                   <div>
-                    <span className="text-xs text-muted-foreground">Created</span>
+                    <span className="text-xs text-muted-foreground">Ouvert</span>
                     <p className="text-sm font-medium">{formatTimestamp(selectedIncident.createdAt)}</p>
                   </div>
                 </div>

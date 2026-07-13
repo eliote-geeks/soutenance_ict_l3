@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Brain, TrendingUp, AlertTriangle, CheckCircle, ShieldAlert, Gauge, Layers3 } from 'lucide-react';
+import { Brain, AlertTriangle, CheckCircle, ShieldAlert, Gauge, Layers3, Activity, SlidersHorizontal, DatabaseZap } from 'lucide-react';
 import { PageHelp } from '@/components/shared/PageHelp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
+import { KPICard } from '@/components/shared/KPICard';
 import { fetchModel } from '@/lib/api';
 import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
@@ -119,6 +120,8 @@ export default function ModelPage() {
   const thresholds = data.thresholds || {};
   const ml = data.ml || {};
   const dedupWindowMinutes = data.dedupWindowMinutes;
+  const detectorMatches = detectors.reduce((sum, detector) => sum + Number(detector.matches || 0), 0);
+  const activeDetectors = detectors.filter(detector => Number(detector.matches || 0) > 0).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -127,7 +130,7 @@ export default function ModelPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">AI Detection</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Monitor anomaly scoring, feature quality and false positives
+            Centre de controle du moteur de detection : regles, ML, seuils, deduplication et qualite des signaux.
           </p>
         </div>
         <Badge className="bg-primary/10 text-primary border-primary/20 gap-1.5">
@@ -135,6 +138,32 @@ export default function ModelPage() {
           Active Model: {activeVersion?.version}
         </Badge>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <KPICard title="Detecteurs actifs" value={activeDetectors} icon={Activity} variant={activeDetectors ? 'success' : 'warning'} delay={0} />
+        <KPICard title="Signaux detectes" value={detectorMatches} icon={Brain} variant="primary" delay={80} />
+        <KPICard title="Fenetre dedup" value={dedupWindowMinutes ? `${dedupWindowMinutes}m` : '--'} icon={ShieldAlert} delay={160} />
+        <KPICard title="ML samples min" value={ml.minSamples ?? '--'} icon={DatabaseZap} delay={240} />
+      </div>
+
+      <Card className="border-border/50 shadow-soft bg-muted/20">
+        <CardContent className="py-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold flex items-center gap-2"><SlidersHorizontal className="w-4 h-4 text-primary" />Regles deterministes</div>
+              <p className="text-muted-foreground mt-1">Detectent les cas connus : brute force, DNS suspect, scan de ports, privilege escalation.</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold flex items-center gap-2"><Brain className="w-4 h-4 text-violet-400" />ML / anomalies</div>
+              <p className="text-muted-foreground mt-1">Repere les comportements inhabituels quand le trafic sort du profil normal.</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background p-3">
+              <div className="font-semibold flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-warning" />Deduplication</div>
+              <p className="text-muted-foreground mt-1">Evite de spammer le SOC avec plusieurs alertes identiques dans la meme fenetre.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Model Versions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -339,18 +368,18 @@ export default function ModelPage() {
             ) : (
               <div className="space-y-3">
                 <div className="text-sm text-muted-foreground">
-                  Live mode uses rule-based detectors on Elastic events. No labeled validation set is available on the running stream.
+              Mode live : NetSentinel combine des regles de detection et un moteur d'anomalies sur les evenements Elastic. Les scores de precision/recall ne sont affiches que lorsqu'un jeu de validation labellise existe.
                 </div>
                 {detectors.map((detector) => (
                   <div key={detector.name} className="rounded-lg border border-border/50 bg-muted/30 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="font-medium text-sm">{detector.name}</div>
-                        <div className="text-xs text-muted-foreground">{detector.rule}</div>
+                        <div className="text-xs text-muted-foreground">Condition : {detector.rule}</div>
                       </div>
                       <div className="text-right">
                         <div className="font-mono text-lg font-bold">{detector.matches}</div>
-                        <div className="text-xs text-muted-foreground">matches</div>
+                        <div className="text-xs text-muted-foreground">signaux</div>
                       </div>
                     </div>
                   </div>

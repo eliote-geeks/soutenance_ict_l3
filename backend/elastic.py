@@ -63,7 +63,7 @@ def elastic_request(method: str, path: str, payload: dict | None = None) -> dict
 
 
 def elastic_index_doc(index: str, doc_id: str, payload: dict[str, Any]) -> bool:
-    response = elastic_request("PUT", f"/{index}/_doc/{doc_id}", payload)
+    response = elastic_request("PUT", f"/{index}/_doc/{doc_id}?refresh=wait_for", payload)
     return bool(response)
 
 
@@ -197,11 +197,19 @@ def fetch_packetbeat_events() -> list[dict]:
 
 def fetch_metricbeat_hosts() -> list[dict]:
     payload = {
-        "size": 20,
+        "size": 250,
         "sort": [{"@timestamp": {"order": "desc"}}],
         "_source": [
             "@timestamp",
             "host.name",
+            "host.ip",
+            "host.os.name",
+            "asset_id",
+            "profile_id",
+            "role",
+            "site",
+            "environment",
+            "event.dataset",
             "kubernetes.node.name",
             "kubernetes.node.cpu.usage.nanocores",
             "kubernetes.node.memory.usage.bytes",
@@ -210,8 +218,20 @@ def fetch_metricbeat_hosts() -> list[dict]:
             "kubernetes.node.network.tx.bytes",
             "kubernetes.node.fs.used.bytes",
             "kubernetes.node.fs.available.bytes",
+            "system.cpu.total.norm.pct",
+            "system.memory.used.pct",
+            "system.fsstat.total_size.used",
+            "system.fsstat.total_size.total",
         ],
-        "query": {"term": {"event.dataset": "kubernetes.node"}},
+        "query": {
+            "bool": {
+                "should": [
+                    {"term": {"event.dataset": "kubernetes.node"}},
+                    {"prefix": {"event.dataset": "system."}},
+                ],
+                "minimum_should_match": 1,
+            }
+        },
     }
     result = elastic_request("GET", f"/{METRICBEAT_INDEX}/_search", payload)
     hits = (((result or {}).get("hits") or {}).get("hits")) or []
@@ -224,18 +244,32 @@ def fetch_metricbeat_hosts() -> list[dict]:
         if hostname in seen:
             continue
         seen.add(hostname)
+        host_data = source.get("host") or {}
+        system = source.get("system") or {}
         cpu_nano = (((node.get("cpu") or {}).get("usage") or {}).get("nanocores")) or 0
         mem_used = (((node.get("memory") or {}).get("usage") or {}).get("bytes")) or 0
         mem_available = (((node.get("memory") or {}).get("available") or {}).get("bytes")) or 1
-        mem_ratio = mem_used / max(mem_used + mem_available, 1)
-        risk = min(95, int((cpu_nano / 10_000_000) + (mem_ratio * 35) + 20))
+        cpu_ratio = (((system.get("cpu") or {}).get("total") or {}).get("norm") or {}).get("pct")
+        mem_ratio = ((system.get("memory") or {}).get("used") or {}).get("pct")
+        if mem_ratio is None:
+            mem_ratio = mem_used / max(mem_used + mem_available, 1)
+        if cpu_ratio is None:
+            cpu_ratio = min(1, cpu_nano / 1_000_000_000) if cpu_nano else 0
+        risk = min(95, int((float(cpu_ratio) * 45) + (float(mem_ratio) * 35) + 20))
+        host_ips = host_data.get("ip") or []
+        primary_ip = host_ips[0] if isinstance(host_ips, list) and host_ips else None
+        asset_id = normalize_text(source.get("asset_id"), f"metricbeat-{hostname}")
         hosts.append(
             {
-                "id": f"metricbeat-{hostname}",
+                "id": asset_id,
+                "asset_id": asset_id,
+                "profile_id": source.get("profile_id"),
                 "hostname": hostname,
-                "ip": "k8s-node",
-                "os": "Linux",
-                "role": "Kubernetes Node",
+                "ip": normalize_text(primary_ip, "metricbeat-host"),
+                "os": normalize_text((host_data.get("os") or {}).get("name"), "Linux"),
+                "role": normalize_text(source.get("role") or ("Kubernetes Node" if node else None), "workstation"),
+                "site": source.get("site"),
+                "environment": source.get("environment"),
                 "riskScore": risk,
                 "criticality": "high" if risk >= 70 else "medium",
                 "lastSeen": parse_es_timestamp(source.get("@timestamp")),
@@ -307,7 +341,24 @@ def fetch_profiles_metadata() -> list[dict[str, Any]]:
 
 
 def fetch_assets_metadata() -> list[dict[str, Any]]:
-    return fetch_index_documents(ASSETS_INDEX)
+    assets = fetch_index_documents(ASSETS_INDEX)
+    if assets:
+        return assets
+    return [
+        {
+            "id": host.get("asset_id") or host.get("id"),
+            "hostname": host.get("hostname"),
+            "host_id": host.get("id"),
+            "ip": host.get("ip"),
+            "os": host.get("os"),
+            "role": host.get("role"),
+            "site": host.get("site"),
+            "environment": host.get("environment"),
+            "tags": ["metricbeat", "auto-discovered"],
+            "created_at": host.get("lastSeen"),
+        }
+        for host in fetch_metricbeat_hosts()
+    ]
 
 
 def fetch_profile_asset_links() -> list[dict[str, Any]]:

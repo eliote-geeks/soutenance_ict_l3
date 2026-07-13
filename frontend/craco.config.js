@@ -57,6 +57,25 @@ const webpackConfig = {
 };
 
 webpackConfig.devServer = (devServerConfig) => {
+  devServerConfig.proxy = {
+    '/api': {
+      target: 'http://127.0.0.1:8010',
+      changeOrigin: true,
+    },
+    '/health': {
+      target: 'http://127.0.0.1:8010',
+      changeOrigin: true,
+    },
+    '/docs': {
+      target: 'http://127.0.0.1:8010',
+      changeOrigin: true,
+    },
+    '/openapi.json': {
+      target: 'http://127.0.0.1:8010',
+      changeOrigin: true,
+    },
+  };
+
   // Add health check endpoints if enabled
   if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
     const originalSetupMiddlewares = devServerConfig.setupMiddlewares;

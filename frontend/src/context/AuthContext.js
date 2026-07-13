@@ -49,10 +49,25 @@ const DEFAULT_USERS = [
   },
 ];
 
+const fallbackHash = (plaintext) => {
+  // Deterministic non-cryptographic fallback for browsers where Web Crypto is unavailable.
+  let hash = 2166136261;
+  for (const char of String(plaintext)) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fallback-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+};
+
 const hashPassword = async (plaintext) => {
   if (!plaintext) return '';
   const encoded = new TextEncoder().encode(String(plaintext));
-  const buffer = await crypto.subtle.digest('SHA-256', encoded);
+  const subtle = globalThis.crypto?.subtle;
+  const digest = typeof subtle?.digest === 'function' ? subtle.digest.bind(subtle) : null;
+  if (!digest) {
+    return fallbackHash(plaintext);
+  }
+  const buffer = await digest('SHA-256', encoded);
   return Array.from(new Uint8Array(buffer))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
