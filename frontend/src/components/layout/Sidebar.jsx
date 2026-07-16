@@ -24,16 +24,16 @@ import { useAuth } from '@/context/AuthContext';
 // Removed: Network Flows (100% fake data), Risk Forecast (fake LSTM claims),
 //          Profile, Users, Settings (not relevant to IDPS demo)
 const navItems = [
-  { path: '/',          icon: LayoutDashboard, label: 'SOC Overview',    badge: false },
-  { path: '/stream',    icon: Radio,           label: 'Telemetry Stream', badge: false },
-  { path: '/logs',      icon: FileSearch,      label: 'Elastic Logs',    badge: false },
-  { path: '/alerts',    icon: Bell,            label: 'Alerts',          badge: true  },
+  { path: '/',          icon: LayoutDashboard, label: 'Tableau SOC',     badge: false },
+  { path: '/stream',    icon: Radio,           label: 'Flux telemetry',  badge: false },
+  { path: '/logs',      icon: FileSearch,      label: 'Logs Elastic',    badge: false },
+  { path: '/alerts',    icon: Bell,            label: 'Alertes',         badge: true  },
   { path: '/incidents', icon: AlertTriangle,   label: 'Incidents',       badge: false },
-  { path: '/hosts',     icon: Server,          label: 'Assets / Hosts',  badge: false },
+  { path: '/hosts',     icon: Server,          label: 'Actifs / Hosts',  badge: false },
   { path: '/agents',    icon: Bot,             label: 'Agents',          badge: false },
-  { path: '/model',     icon: Brain,           label: 'AI Detection',    badge: false },
-  { path: '/pipeline',  icon: Activity,        label: 'Stack Health',    badge: false },
-  { path: '/reports',   icon: FileText,        label: 'Reports',         badge: false },
+  { path: '/model',     icon: Brain,           label: 'Moteur IA',       badge: false },
+  { path: '/pipeline',  icon: Activity,        label: 'Sante stack',     badge: false },
+  { path: '/reports',   icon: FileText,        label: 'Rapports',        badge: false },
   { path: '/guide',     icon: BookOpen,        label: 'User Guide',      badge: false },
 ];
 
@@ -64,7 +64,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         {!isCollapsed && (
           <div className="animate-fade-in overflow-hidden">
             <h1 className="font-bold text-foreground leading-tight">NetSentinel AI</h1>
-            <span className="text-xs text-muted-foreground">Elastic + IA Security Lab</span>
+            <span className="text-xs text-muted-foreground">SOC Elastic + IA</span>
           </div>
         )}
       </div>
@@ -73,7 +73,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
       <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
         {!isCollapsed && (
           <p className="px-2 mb-2 text-[11px] uppercase tracking-wide text-muted-foreground/70">
-            Core
+            SOC
           </p>
         )}
 
@@ -120,7 +120,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         <div className="mt-2 pt-2 border-t border-border/50">
           {!isCollapsed && (
             <p className="px-2 mb-1 text-[11px] uppercase tracking-wide text-destructive/60">
-              Danger
+            Administration
             </p>
           )}
           <NavLink
@@ -132,7 +132,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
             <RotateCcw className="w-5 h-5 flex-shrink-0 text-destructive/70 group-hover:text-destructive transition-colors" />
             {!isCollapsed && (
               <span className="truncate animate-fade-in text-destructive/80 group-hover:text-destructive">
-                Reset App
+                Reinitialiser
               </span>
             )}
           </NavLink>
@@ -144,7 +144,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         <div className="p-4 border-t border-border">
           <div className="text-xs text-muted-foreground space-y-0.5">
             <p className="font-medium text-foreground/80">University of Yaoundé I</p>
-            <p>Computer Science Dept.</p>
+            <p>ICTD L3 - Computer Science Dept.</p>
             <p>Group P37</p>
           </div>
         </div>

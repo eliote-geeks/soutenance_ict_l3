@@ -117,7 +117,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
       <div className="flex-1 max-w-xl relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search... (KQL: severity:critical AND source:firewall)"
+          placeholder="Rechercher... (KQL: severity:critical AND source:firewall)"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10 bg-background/50 border-border/50 focus:bg-background transition-colors"
@@ -132,7 +132,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="prod">Production</SelectItem>
-            <SelectItem value="dev">Development</SelectItem>
+            <SelectItem value="dev">Developpement</SelectItem>
             <SelectItem value="lab">Lab</SelectItem>
           </SelectContent>
         </Select>
@@ -150,8 +150,8 @@ export const TopBar = ({ sidebarCollapsed }) => {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Assets</SelectItem>
-            <SelectItem value="profile">Profile</SelectItem>
+            <SelectItem value="all">Tous les actifs</SelectItem>
+            <SelectItem value="profile">Profil</SelectItem>
             <SelectItem value="asset">Asset</SelectItem>
           </SelectContent>
         </Select>
@@ -194,11 +194,11 @@ export const TopBar = ({ sidebarCollapsed }) => {
 
         <Badge variant="outline" className="h-7 px-2.5 gap-1.5 cursor-pointer hover:bg-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-          Critical
+          Critique
         </Badge>
         <Badge variant="outline" className="h-7 px-2.5 gap-1.5 cursor-pointer hover:bg-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-warning" />
-          High
+          Eleve
         </Badge>
       </div>
 
@@ -211,7 +211,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
           ) : (
             <WifiOff className="w-3.5 h-3.5 text-destructive" />
           )}
-          <span className="text-xs font-mono font-medium text-success">LIVE</span>
+          <span className="text-xs font-mono font-medium text-success">ACTIF</span>
         </div>
 
         {/* Last refresh */}

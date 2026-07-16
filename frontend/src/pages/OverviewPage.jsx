@@ -74,51 +74,77 @@ export default function OverviewPage() {
   }
 
   const { kpis, trafficData, riskyHosts, attackingIPs, anomalyScore } = data;
+  const totalEvents = (trafficData || []).reduce(
+    (sum, point) => sum + Number(point.events || point.alerts || 0),
+    0
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">SOC Overview</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Unified view of Filebeat, Packetbeat, fail2ban and AI detections
-        </p>
+      <div className="relative overflow-hidden rounded-xl border border-primary/15 bg-gradient-to-r from-slate-950 via-slate-900 to-teal-950 p-5 text-white shadow-soft">
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.25),transparent_45%)]" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-300/20 bg-teal-300/10 px-3 py-1 text-xs font-medium text-teal-100">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.16)]" />
+              Supervision en temps reel
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">NetSentinel AI</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Tableau SOC connecte aux journaux Elastic, aux agents enrolables et au moteur de detection IA.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-right">
+            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-[11px] uppercase text-slate-400">Alertes</div>
+              <div className="mt-1 font-mono text-xl font-semibold">{kpis.totalAlerts}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-[11px] uppercase text-slate-400">Anomalies</div>
+              <div className="mt-1 font-mono text-xl font-semibold">{kpis.anomalies}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-[11px] uppercase text-slate-400">Evenements</div>
+              <div className="mt-1 font-mono text-xl font-semibold">{totalEvents}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Total Alerts"
+          title="Alertes totales"
           value={kpis.totalAlerts}
           trend={kpis.alertsTrend}
-          trendLabel="vs last 24h"
+          trendLabel="vs 24h"
           icon={AlertTriangle}
           variant="warning"
           delay={100}
         />
         <KPICard
-          title="Anomalies Detected"
+          title="Anomalies detectees"
           value={kpis.anomalies}
           trend={kpis.anomaliesTrend}
-          trendLabel="vs last 24h"
+          trendLabel="vs 24h"
           icon={Activity}
           variant="danger"
           delay={200}
         />
         <KPICard
-          title="Open Incidents"
+          title="Incidents ouverts"
           value={kpis.incidentsOpen}
           trend={kpis.incidentsTrend}
-          trendLabel="vs last week"
+          trendLabel="vs semaine"
           icon={Shield}
           variant="primary"
           delay={300}
         />
         <KPICard
-          title="Mean Time to Detect"
+          title="Temps moyen detection"
           value={`${kpis.meanTimeToDetect}m`}
           trend={kpis.mttdTrend}
-          trendLabel="improvement"
+          trendLabel="amelioration"
           icon={Clock}
           variant="success"
           delay={400}
@@ -131,7 +157,7 @@ export default function OverviewPage() {
         <Card className="lg:col-span-2 border-border/50 shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-semibold">
-              Packetbeat Traffic Stream
+              Flux reseau Packetbeat
             </CardTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="status-dot pulse bg-success" />
@@ -158,7 +184,7 @@ export default function OverviewPage() {
             />
             <div className="mt-4 w-full">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                <span>12h Trend</span>
+                <span>Tendance 12h</span>
                 <span className="font-mono">{anomalyScore.trend[anomalyScore.trend.length - 1]}</span>
               </div>
               <SparklineChart 
@@ -182,9 +208,9 @@ export default function OverviewPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Server className="w-4 h-4 text-warning" />
-              Top Risky Hosts
+              Hosts les plus risques
             </CardTitle>
-            <span className="text-xs text-muted-foreground">By risk score</span>
+            <span className="text-xs text-muted-foreground">Par score de risque</span>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -217,7 +243,7 @@ export default function OverviewPage() {
                       {host.riskScore}
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {host.alertCount} alerts
+                      {host.alertCount} alertes
                     </span>
                   </div>
                   <div 
@@ -239,9 +265,9 @@ export default function OverviewPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Globe className="w-4 h-4 text-destructive" />
-              Top Attacking IPs
+              IP attaquantes
             </CardTitle>
-            <span className="text-xs text-muted-foreground">Last 24h</span>
+            <span className="text-xs text-muted-foreground">Dernieres 24h</span>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
