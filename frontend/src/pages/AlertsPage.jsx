@@ -184,6 +184,7 @@ export default function AlertsPage() {
   const [filterSourceType, setFilterSourceType] = useState('all');
   const [filterAttackType, setFilterAttackType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [actionResult, setActionResult] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -208,7 +209,14 @@ export default function AlertsPage() {
       setAlerts(prev => prev.map(a =>
         a.id === alertId ? { ...a, status: 'investigating' } : a
       ));
-      toast.success('Alert acknowledged', { description: `Alert ${alertId} is now being investigated` });
+      setActionResult({
+        title: 'Alerte prise en charge',
+        status: 'investigating',
+        description: `L'alerte ${alertId} est marquee comme en investigation.`,
+        impact: "Elle reste visible dans Alertes, mais l'equipe sait qu'elle est deja traitee.",
+        nextLabel: 'Voir les alertes',
+        nextHref: '/alerts',
+      });
     } catch {
       toast.error('Failed to acknowledge alert');
     }
@@ -216,8 +224,15 @@ export default function AlertsPage() {
 
   const handleIsolateHost = async (hostname) => {
     try {
-      await isolateHost(hostname);
-      toast.success('Host isolated', { description: `${hostname} has been isolated from the network` });
+      const result = await isolateHost(hostname);
+      setActionResult({
+        title: 'Isolation du host demandee',
+        status: result.success ? 'done' : 'not_applied',
+        description: `${hostname} est marque comme isole cote plateforme.`,
+        impact: "Si un agent actif est disponible, l'isolation peut etre appliquee sur la machine. Sinon l'etat applicatif sert de trace de decision.",
+        nextLabel: 'Verifier le host',
+        nextHref: '/hosts',
+      });
     } catch {
       toast.error('Failed to isolate host');
     }
@@ -225,12 +240,21 @@ export default function AlertsPage() {
 
   const handleBlockIP = async (alert) => {
     try {
-      await blockIP(alert.sourceIP, {
+      const result = await blockIP(alert.sourceIP, {
         hostname: alert.hostname,
         reason: `Reponse manuelle a l'alerte ${alert.id}`,
         duration_minutes: 30,
       });
-      toast.success('Blocage enregistre', { description: 'Verifier le resultat dans Resolution.' });
+      setActionResult({
+        title: 'Blocage IP enregistre',
+        status: result.status || 'pending',
+        description: `${alert.sourceIP} est ajoutee a la reponse NetSentinel pour ${alert.hostname}.`,
+        impact: result.enforced
+          ? "Un agent actif a recu l'ordre de blocage."
+          : "Aucun agent actif n'a encore confirme l'application. Le statut reste visible dans Resolution.",
+        nextLabel: 'Voir Resolution',
+        nextHref: '/resolution',
+      });
     } catch {
       toast.error('Echec du blocage IP');
     }
@@ -239,7 +263,14 @@ export default function AlertsPage() {
   const handleCreateTicket = async (alertId) => {
     try {
       const result = await createTicket(alertId, { priority: 'high' });
-      toast.success('Ticket created', { description: `Ticket ${result.ticketId} created` });
+      setActionResult({
+        title: 'Ticket cree',
+        status: result.ticketId,
+        description: `Ticket ${result.ticketId} cree pour l'alerte ${alertId}.`,
+        impact: "Le ticket sert de trace de suivi pour presenter que l'alerte doit etre traitee jusqu'a resolution.",
+        nextLabel: 'Rester sur Alertes',
+        nextHref: '/alerts',
+      });
     } catch {
       toast.error('Failed to create ticket');
     }
@@ -493,17 +524,17 @@ export default function AlertsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleAcknowledge(alert.id)}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAcknowledge(alert.id); }}>
                       <Check className="w-4 h-4 mr-2" />Acknowledge
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleIsolateHost(alert.hostname)}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleIsolateHost(alert.hostname); }}>
                       <Shield className="w-4 h-4 mr-2" />Isolate Host
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBlockIP(alert)}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleBlockIP(alert); }}>
                       <Ban className="w-4 h-4 mr-2" />Block IP
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleCreateTicket(alert.id)}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCreateTicket(alert.id); }}>
                       <Ticket className="w-4 h-4 mr-2" />Create Ticket
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -625,6 +656,40 @@ export default function AlertsPage() {
               </>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!actionResult} onOpenChange={() => setActionResult(null)}>
+        <DialogContent className="max-w-md">
+          {actionResult && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{actionResult.title}</DialogTitle>
+                <DialogDescription>{actionResult.description}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <div className="text-xs text-muted-foreground">Statut</div>
+                  <div className="mt-1 font-mono text-sm font-semibold">{actionResult.status}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  {actionResult.impact}
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setActionResult(null)}>
+                  Fermer
+                </Button>
+                <Button
+                  onClick={() => {
+                    window.location.href = actionResult.nextHref;
+                  }}
+                >
+                  {actionResult.nextLabel}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
