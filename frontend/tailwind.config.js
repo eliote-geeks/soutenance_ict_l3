@@ -88,13 +88,13 @@ module.exports = {
         }
       },
       boxShadow: {
-        'soft': '0 2px 8px -2px hsl(var(--foreground) / 0.06), 0 4px 16px -4px hsl(var(--foreground) / 0.04)',
-        'medium': '0 4px 12px -2px hsl(var(--foreground) / 0.08), 0 8px 24px -4px hsl(var(--foreground) / 0.06)',
+        'soft': 'none',
+        'medium': 'none',
         'glow-teal': '0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.15)',
         'glow-amber': '0 0 20px hsl(var(--warning) / 0.3), 0 0 40px hsl(var(--warning) / 0.15)',
         'glow-danger': '0 0 20px hsl(var(--destructive) / 0.3), 0 0 40px hsl(var(--destructive) / 0.15)',
-        'card': '0 1px 3px hsl(var(--foreground) / 0.04), 0 4px 12px hsl(var(--foreground) / 0.02)',
-        'card-hover': '0 4px 8px hsl(var(--foreground) / 0.06), 0 8px 24px hsl(var(--foreground) / 0.04)',
+        'card': 'none',
+        'card-hover': 'none',
       },
       keyframes: {
         'accordion-down': {
