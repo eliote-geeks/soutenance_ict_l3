@@ -32,6 +32,17 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export const TrafficChart = ({ data, height = 300 }) => {
+  const chartData = (data || []).map((point) => ({
+    ...point,
+    time: point.time || (point.timestamp
+      ? new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : ''),
+    anomalous: point.anomalous ?? point.alerts ?? 0,
+    inbound: point.inbound ?? 0,
+    outbound: point.outbound ?? 0,
+    blocked: point.blocked ?? 0,
+  }));
+
   const [activeAreas, setActiveAreas] = useState({
     inbound: true,
     outbound: true,
@@ -75,7 +86,7 @@ export const TrafficChart = ({ data, height = 300 }) => {
       </div>
 
       <ResponsiveContainer width="100%" height={height}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <defs>
             {areaConfig.map(({ key, color }) => (
               <linearGradient key={key} id={`gradient-${key}`} x1="0" y1="0" x2="0" y2="1">
