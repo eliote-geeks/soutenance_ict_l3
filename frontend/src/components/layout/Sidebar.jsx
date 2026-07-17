@@ -12,6 +12,7 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Network,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -22,13 +23,14 @@ import { useAuth } from '@/context/AuthContext';
 //          Profile, Users, Settings (not relevant to IDPS demo)
 const navItems = [
   { path: '/',          icon: LayoutDashboard, label: 'Dashboard',       badge: false },
-  { path: '/alerts',    icon: Bell,            label: 'Alertes',         badge: true  },
+  { path: '/alerts',    icon: Bell,            label: 'Alerts & Intrusions', badge: true  },
   { path: '/incidents', icon: AlertTriangle,   label: 'Incidents',       badge: false },
+  { path: '/alerts',    icon: Network,         label: 'Traffic Analysis', badge: false },
   { path: '/hosts',     icon: Server,          label: 'Hosts',           badge: false },
   { path: '/agents',    icon: Bot,             label: 'Agents',          badge: false },
   { path: '/resolution', icon: ShieldCheck,    label: 'Resolution',      badge: false },
-  { path: '/model',     icon: Brain,           label: 'IA',              badge: false },
-  { path: '/pipeline',  icon: Activity,        label: 'Sante',           badge: false },
+  { path: '/model',     icon: Brain,           label: 'Detection Rules', badge: false },
+  { path: '/pipeline',  icon: Activity,        label: 'Stack Health',    badge: false },
 ];
 
 export const Sidebar = ({ collapsed, onToggle }) => {
@@ -47,7 +49,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
     <aside
       className={cn(
         'fixed left-0 top-0 h-screen bg-card border-r border-border z-40 flex flex-col transition-all duration-300',
-        isCollapsed ? 'w-[72px]' : 'w-64'
+        isCollapsed ? 'w-[72px]' : 'w-72'
       )}
     >
       {/* ── Logo ─────────────────────────────────────────────────────────── */}
@@ -66,9 +68,10 @@ export const Sidebar = ({ collapsed, onToggle }) => {
       {/* ── Navigation ───────────────────────────────────────────────────── */}
       <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
         {!isCollapsed && (
-          <p className="px-2 mb-2 text-[11px] uppercase text-muted-foreground/70">
-            SOC
-          </p>
+          <div className="mb-5 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-success" />
+            System Active
+          </div>
         )}
 
         <div className="space-y-1">
