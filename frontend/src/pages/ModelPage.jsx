@@ -1,464 +1,146 @@
-import { useState, useEffect } from 'react';
-import { Brain, AlertTriangle, CheckCircle, ShieldAlert, Gauge, Layers3, Activity, SlidersHorizontal, DatabaseZap } from 'lucide-react';
-import { PageHelp } from '@/components/shared/PageHelp';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, Brain, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
-import { KPICard } from '@/components/shared/KPICard';
 import { fetchModel } from '@/lib/api';
 import { useScope } from '@/context/ScopeContext';
-import { cn } from '@/lib/utils';
-
-const CustomTooltip = ({ active, payload, label }) => {
-  if (!active || !payload) return null;
-  return (
-    <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
-      <p className="text-sm font-medium text-foreground mb-1">{label}</p>
-      <p className="text-xs text-muted-foreground">
-        Importance: <span className="font-mono">{(payload[0]?.value * 100).toFixed(1)}%</span>
-      </p>
-    </div>
-  );
-};
-
-const percentLabel = (value) => (
-  typeof value === 'number' ? `${(value * 100).toFixed(0)}%` : '--'
-);
-
-const progressValue = (value) => (
-  typeof value === 'number' ? value * 100 : 0
-);
 
 export default function ModelPage() {
   const { scopeKey } = useScope();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const result = await fetchModel();
-        setData(result);
-        setError('');
+        setData(await fetchModel());
       } catch (error) {
         console.error('Failed to load model data:', error);
-        setError("Impossible de charger les donnees du modele.");
       } finally {
         setLoading(false);
       }
     };
-
     loadData();
   }, [scopeKey]);
 
+  const summary = useMemo(() => {
+    const detectors = data?.detectors || [];
+    return {
+      detectors: detectors.length,
+      signals: detectors.reduce((sum, item) => sum + Number(item.matches || 0), 0),
+      active: detectors.filter((item) => Number(item.matches || 0) > 0).length,
+    };
+  }, [data]);
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <LoadingSkeleton variant="card" />
-          <LoadingSkeleton variant="chart" className="lg:col-span-2" />
-        </div>
+      <div className="space-y-5">
+        <LoadingSkeleton variant="card" />
+        <LoadingSkeleton variant="table" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="space-y-4 animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">AI Detection</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Monitor anomaly scoring, feature quality and false positives
-          </p>
-        </div>
-        <Card className="border-border/50 shadow-soft">
-          <CardContent className="py-8">
-            <div className="text-sm text-destructive font-medium">
-              {error || "Aucune donnee modele disponible."}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-6 text-sm text-destructive">Moteur IA indisponible.</CardContent>
+      </Card>
     );
   }
 
-  const versions = Array.isArray(data.versions) ? data.versions : [];
-  const featureImportance = Array.isArray(data.featureImportance)
-    ? data.featureImportance
-    : Array.isArray(data.features)
-      ? data.features.map((feature) => ({
-          feature: feature.feature || feature.name || 'unknown',
-          importance: Number(feature.importance || 0),
-        }))
-      : [];
-  const confusionMatrix = data.confusionMatrix || {
-    truePositive: Math.max(1, Math.round((versions[0]?.recall || 0.85) * 100)),
-    falsePositive: versions[0]?.falsePositives || 0,
-    trueNegative: 100,
-    falseNegative: Math.max(1, Math.round((1 - (versions[0]?.recall || 0.85)) * 20)),
-  };
-  const activeVersion = versions.find(v => v.status === 'active');
-
-  // Calculate metrics from confusion matrix
-  const total = confusionMatrix.truePositive + confusionMatrix.falsePositive + 
-                confusionMatrix.trueNegative + confusionMatrix.falseNegative;
-  const accuracy = total > 0
-    ? ((confusionMatrix.truePositive + confusionMatrix.trueNegative) / total * 100).toFixed(1)
-    : '0.0';
-  const detectors = Array.isArray(data.detectors) ? data.detectors : [];
+  const detectors = data.detectors || [];
   const thresholds = data.thresholds || {};
   const ml = data.ml || {};
-  const dedupWindowMinutes = data.dedupWindowMinutes;
-  const detectorMatches = detectors.reduce((sum, detector) => sum + Number(detector.matches || 0), 0);
-  const activeDetectors = detectors.filter(detector => Number(detector.matches || 0) > 0).length;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-5 animate-fade-in">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">AI Detection</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Centre de controle du moteur de detection : regles, ML, seuils, deduplication et qualite des signaux.
-          </p>
+          <h1 className="text-2xl font-bold">Moteur IA</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Detection par regles et anomalies reseau.</p>
         </div>
-        <Badge className="bg-primary/10 text-primary border-primary/20 gap-1.5">
-          <Brain className="w-3 h-3" />
-          Active Model: {activeVersion?.version}
+        <Badge className="w-fit bg-primary/10 text-primary border-primary/20">
+          {ml.enabled ? 'ML actif' : 'ML inactif'}
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard title="Detecteurs actifs" value={activeDetectors} icon={Activity} variant={activeDetectors ? 'success' : 'warning'} delay={0} />
-        <KPICard title="Signaux detectes" value={detectorMatches} icon={Brain} variant="primary" delay={80} />
-        <KPICard title="Fenetre dedup" value={dedupWindowMinutes ? `${dedupWindowMinutes}m` : '--'} icon={ShieldAlert} delay={160} />
-        <KPICard title="ML samples min" value={ml.minSamples ?? '--'} icon={DatabaseZap} delay={240} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card><CardContent className="p-4"><div className="text-2xl font-bold font-mono">{summary.detectors}</div><div className="text-xs text-muted-foreground">Detecteurs</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-2xl font-bold font-mono">{summary.active}</div><div className="text-xs text-muted-foreground">Actifs</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-2xl font-bold font-mono">{summary.signals}</div><div className="text-xs text-muted-foreground">Signaux</div></CardContent></Card>
       </div>
 
-      <Card className="border-border/50 shadow-soft bg-muted/20">
-        <CardContent className="py-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-            <div className="rounded-lg border border-border/50 bg-background p-3">
-              <div className="font-semibold flex items-center gap-2"><SlidersHorizontal className="w-4 h-4 text-primary" />Regles deterministes</div>
-              <p className="text-muted-foreground mt-1">Detectent les cas connus : brute force, DNS suspect, scan de ports, privilege escalation.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <Card className="border-border/60 shadow-soft">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-4 w-4 text-primary" />
+              Detecteurs
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {detectors.map((detector) => (
+              <div key={detector.name} className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
+                <div>
+                  <div className="font-medium">{detector.name}</div>
+                  <div className="text-xs text-muted-foreground">{detector.rule}</div>
+                </div>
+                <div className="font-mono text-lg font-bold">{detector.matches}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 shadow-soft">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <SlidersHorizontal className="h-4 w-4 text-warning" />
+              Parametres
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Echecs SSH</span>
+              <span className="font-mono">{thresholds.sshFailure ?? '--'}</span>
             </div>
-            <div className="rounded-lg border border-border/50 bg-background p-3">
-              <div className="font-semibold flex items-center gap-2"><Brain className="w-4 h-4 text-violet-400" />ML / anomalies</div>
-              <p className="text-muted-foreground mt-1">Repere les comportements inhabituels quand le trafic sort du profil normal.</p>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Anomalies DNS</span>
+              <span className="font-mono">{thresholds.dnsAnomaly ?? '--'}</span>
             </div>
-            <div className="rounded-lg border border-border/50 bg-background p-3">
-              <div className="font-semibold flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-warning" />Deduplication</div>
-              <p className="text-muted-foreground mt-1">Evite de spammer le SOC avec plusieurs alertes identiques dans la meme fenetre.</p>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Ports distincts</span>
+              <span className="font-mono">{thresholds.portScanDistinctPorts ?? '--'}</span>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Fenetre anti-doublon</span>
+              <span className="font-mono">{data.dedupWindowMinutes ?? '--'} min</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Historique ML</span>
+              <span className="font-mono">{ml.historyHours ?? '--'} h</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-border/60 bg-muted/20">
+        <CardContent className="grid gap-3 p-4 text-sm md:grid-cols-3">
+          <div className="flex gap-2">
+            <ShieldAlert className="mt-0.5 h-4 w-4 text-warning" />
+            <span>Les regles detectent les attaques connues.</span>
+          </div>
+          <div className="flex gap-2">
+            <Brain className="mt-0.5 h-4 w-4 text-primary" />
+            <span>Le ML signale les comportements anormaux.</span>
+          </div>
+          <div className="flex gap-2">
+            <Activity className="mt-0.5 h-4 w-4 text-success" />
+            <span>Les alertes sont envoyees vers Alertes et Incidents.</span>
           </div>
         </CardContent>
       </Card>
-
-      {/* Model Versions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {versions.map((version, index) => (
-          <Card 
-            key={version.version}
-            className={cn(
-              "border-border/50 shadow-soft transition-all",
-              version.status === 'active' && "border-primary/30 bg-primary/5"
-            )}
-          >
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-lg">{version.version}</span>
-                  {version.status === 'active' && (
-                    <Badge className="bg-success/10 text-success border-success/20">
-                      Active
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  Deployed {version.deployedAt}
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs text-muted-foreground">Precision</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium">{percentLabel(version.precision)}</span>
-                    <Progress value={progressValue(version.precision)} className="h-1.5 flex-1 [&>div]:bg-primary" />
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Recall</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium">{percentLabel(version.recall)}</span>
-                    <Progress value={progressValue(version.recall)} className="h-1.5 flex-1 [&>div]:bg-chart-4" />
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">F1 Score</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium">{percentLabel(version.f1)}</span>
-                    <Progress value={progressValue(version.f1)} className="h-1.5 flex-1 [&>div]:bg-warning" />
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">False Positives</span>
-                  <span className="font-mono font-medium block">{version.falsePositives}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-border/50 shadow-soft">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-primary/10">
-                <ShieldAlert className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Dedup Window</p>
-                <p className="text-2xl font-bold font-mono">{dedupWindowMinutes ?? '--'}m</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 shadow-soft">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-warning/10">
-                <Gauge className="w-5 h-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">ML Contamination</p>
-                <p className="text-2xl font-bold font-mono">
-                  {typeof ml.contamination === 'number' ? `${(ml.contamination * 100).toFixed(0)}%` : '--'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 shadow-soft">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-success/10">
-                <Layers3 className="w-5 h-5 text-success" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">ML History Window</p>
-                <p className="text-2xl font-bold font-mono">{ml.historyHours ?? '--'}h</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Feature Importance */}
-        <Card className="border-border/50 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">
-              Feature Importance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart 
-                data={featureImportance} 
-                layout="vertical"
-                margin={{ top: 5, right: 20, left: 100, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                <XAxis 
-                  type="number" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                  tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
-                />
-                <YAxis 
-                  type="category" 
-                  dataKey="feature" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
-                  width={90}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar 
-                  dataKey="importance" 
-                  fill="hsl(var(--primary))" 
-                  radius={[0, 4, 4, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Confusion Matrix */}
-        <Card className="border-border/50 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">
-              Confusion Matrix
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.confusionMatrix ? (
-              <>
-                <div className="flex items-center justify-center mb-6">
-                  <div className="text-center">
-                    <span className="text-4xl font-bold text-primary">{accuracy}%</span>
-                    <p className="text-sm text-muted-foreground">Overall Accuracy</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto">
-                  <div className="aspect-square rounded-lg bg-success/20 p-4 flex flex-col items-center justify-center">
-                    <span className="font-mono text-2xl font-bold text-success">
-                      {confusionMatrix.truePositive}
-                    </span>
-                    <span className="text-xs text-success/80">True Positive</span>
-                  </div>
-                  <div className="aspect-square rounded-lg bg-destructive/20 p-4 flex flex-col items-center justify-center">
-                    <span className="font-mono text-2xl font-bold text-destructive">
-                      {confusionMatrix.falsePositive}
-                    </span>
-                    <span className="text-xs text-destructive/80">False Positive</span>
-                  </div>
-                  <div className="aspect-square rounded-lg bg-destructive/20 p-4 flex flex-col items-center justify-center">
-                    <span className="font-mono text-2xl font-bold text-destructive">
-                      {confusionMatrix.falseNegative}
-                    </span>
-                    <span className="text-xs text-destructive/80">False Negative</span>
-                  </div>
-                  <div className="aspect-square rounded-lg bg-success/20 p-4 flex flex-col items-center justify-center">
-                    <span className="font-mono text-2xl font-bold text-success">
-                      {confusionMatrix.trueNegative}
-                    </span>
-                    <span className="text-xs text-success/80">True Negative</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-6 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-success" />
-                    <span className="text-sm">Predicted Positive</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-destructive" />
-                    <span className="text-sm">Predicted Negative</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-3">
-                <div className="text-sm text-muted-foreground">
-              Mode live : NetSentinel combine des regles de detection et un moteur d'anomalies sur les evenements Elastic. Les scores de precision/recall ne sont affiches que lorsqu'un jeu de validation labellise existe.
-                </div>
-                {detectors.map((detector) => (
-                  <div key={detector.name} className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-medium text-sm">{detector.name}</div>
-                        <div className="text-xs text-muted-foreground">Condition : {detector.rule}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-mono text-lg font-bold">{detector.matches}</div>
-                        <div className="text-xs text-muted-foreground">signaux</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-border/50 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">
-              Runtime Thresholds
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">SSH failures</div>
-                <div className="font-mono text-lg font-bold">{thresholds.sshFailure ?? '--'}</div>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">DNS anomalies</div>
-                <div className="font-mono text-lg font-bold">{thresholds.dnsAnomaly ?? '--'}</div>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                <div className="text-xs text-muted-foreground">Distinct ports</div>
-                <div className="font-mono text-lg font-bold">{thresholds.portScanDistinctPorts ?? '--'}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 shadow-soft">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">
-              ML Runtime
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Enabled</span>
-                <Badge className={cn(
-                  ml.enabled ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground'
-                )}>
-                  {ml.enabled ? 'Active' : 'Disabled'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Bucket size</span>
-                <span className="font-mono">{ml.bucketMinutes ?? '--'} min</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Min samples</span>
-                <span className="font-mono">{ml.minSamples ?? '--'}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <PageHelp
-        title="AI Detection"
-        description="Anomaly detection powered by a One-Class SVM trained on normal network behaviour. Deviations from the baseline trigger alerts."
-        items={[
-          { label: 'Model metrics', desc: 'Shows current model version, training date, accuracy and the number of samples used for training.' },
-          { label: 'Anomaly score', desc: 'A real-time score computed for each incoming event batch. Above 70 = anomalous; above 85 = high confidence threat.' },
-          { label: 'Feature importance', desc: 'Bar chart showing which network features (packet size, entropy, port distribution…) contribute most to detections.' },
-          { label: 'Detection history', desc: 'Timeline of anomaly score over the last 24h — look for spikes that correlate with alert bursts.' },
-        ]}
-        tips={[
-          { type: 'info', text: 'The One-Class SVM is trained only on normal traffic samples — it does not require labelled attack data.' },
-          { type: 'tip', text: 'A sudden drop in the anomaly score after a spike may indicate the attacker switched to slower, evasive techniques.' },
-          { type: 'warning', text: 'Model accuracy degrades if the network profile changes significantly (e.g. new application deployed). Retrain periodically.' },
-        ]}
-      />
     </div>
   );
 }

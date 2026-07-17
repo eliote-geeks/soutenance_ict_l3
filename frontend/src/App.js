@@ -18,6 +18,7 @@ import AlertsPage        from '@/pages/AlertsPage';
 import IncidentsPage     from '@/pages/IncidentsPage';
 import HostsPage         from '@/pages/HostsPage';
 import AgentsPage        from '@/pages/AgentsPage';
+import ResolutionPage    from '@/pages/ResolutionPage';
 import ModelPage         from '@/pages/ModelPage';
 import PipelinePage      from '@/pages/PipelinePage';
 import ReportsPage       from '@/pages/ReportsPage';
@@ -78,6 +79,7 @@ function App() {
                 <Route path="/incidents" element={<IncidentsPage />} />
                 <Route path="/hosts"     element={<HostsPage />} />
                 <Route path="/agents"    element={<AgentsPage />} />
+                <Route path="/resolution" element={<ResolutionPage />} />
                 <Route path="/model"     element={<ModelPage />} />
                 <Route path="/pipeline"  element={<PipelinePage />} />
                 <Route path="/reports"   element={<ReportsPage />} />

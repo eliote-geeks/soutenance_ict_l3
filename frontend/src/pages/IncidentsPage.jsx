@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { PageHelp } from '@/components/shared/PageHelp';
 import {
   AlertTriangle,
   Clock,
@@ -116,29 +115,6 @@ export default function IncidentsPage() {
         <KPICard title="Alertes groupees" value={totalAlerts} icon={GitMerge} variant="primary" delay={160} />
         <KPICard title="Hosts touches" value={totalHosts} icon={Users} delay={240} />
       </div>
-
-      <Card className="border-border/50 shadow-soft bg-muted/20">
-        <CardContent className="py-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-            <div className="rounded-lg border border-border/50 bg-background p-3">
-              <div className="font-semibold">1. Declencheur</div>
-              <p className="text-muted-foreground mt-1">Quelle alerte a lance le dossier ? Source, host, signature.</p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-background p-3">
-              <div className="font-semibold">2. Correlation</div>
-              <p className="text-muted-foreground mt-1">Alertes similaires, meme IP, meme host ou meme tactique MITRE.</p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-background p-3">
-              <div className="font-semibold">3. Impact</div>
-              <p className="text-muted-foreground mt-1">Nombre d'hotes touches et criticite du perimetre.</p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-background p-3">
-              <div className="font-semibold">4. Containment</div>
-              <p className="text-muted-foreground mt-1">Action attendue : bloquer, isoler, surveiller ou escalader.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Incidents List */}
@@ -335,22 +311,6 @@ export default function IncidentsPage() {
           </div>
         )}
       </div>
-
-      <PageHelp
-        title="Incidents"
-        description="Incidents group related alerts into a single investigation case. Track status, assign severity and review the full timeline."
-        items={[
-          { label: 'View incident list', desc: 'Each incident card shows severity, affected assets, and current status (Open / In Progress / Resolved).' },
-          { label: 'Open an incident', desc: 'Click a card to see the full timeline of correlated alerts that triggered the incident.' },
-          { label: 'Update status', desc: 'Change the incident status as your investigation progresses — keep the queue current for the whole team.' },
-          { label: 'MITRE mapping', desc: 'Each incident is tagged with the ATT&CK tactic chain to map the attack kill chain.' },
-        ]}
-        tips={[
-          { type: 'tip', text: 'Incidents are automatically created when multiple correlated alerts fire within a short time window.' },
-          { type: 'info', text: 'Resolving an incident does not close the underlying alerts — manage alert status separately on the Alerts page.' },
-          { type: 'warning', text: 'High-severity incidents with no status update after 1 hour will re-trigger a Critical alert.' },
-        ]}
-      />
     </div>
   );
 }

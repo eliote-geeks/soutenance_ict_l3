@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Activity, Shield, Server, Globe, Bot } from 'lucide-react';
+import { AlertTriangle, Activity, Shield, Server, Globe, Bot, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
@@ -137,6 +137,9 @@ export default function OverviewPage() {
             </Button>
             <Button asChild variant="outline" className="justify-start gap-2">
               <a href="/hosts"><Server className="h-4 w-4" />Verifier les hosts</a>
+            </Button>
+            <Button asChild variant="outline" className="justify-start gap-2">
+              <a href="/resolution"><ShieldCheck className="h-4 w-4" />Audit resolution</a>
             </Button>
           </CardContent>
         </Card>

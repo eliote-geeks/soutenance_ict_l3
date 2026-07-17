@@ -177,11 +177,19 @@ export const isolateHost = async (hostId) => fetchJson(`/hosts/${hostId}/isolate
   method: 'POST',
 });
 
-export const blockIP = async (ip) => fetchJson('/firewall/block', {
+export const blockIP = async (ip, options = {}) => fetchJson('/firewall/block', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ ip }),
+  body: JSON.stringify({ ip, ...options }),
 });
+
+export const unblockIP = async (ip, reason = 'Levee manuelle depuis NetSentinel') => fetchJson('/firewall/unblock', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ip, reason }),
+});
+
+export const fetchFirewallBlocks = async (activeOnly = false) => fetchJson(`/firewall/blocks?active_only=${activeOnly}`);
 
 export const createTicket = async (alertId, data) => fetchJson('/tickets', {
   method: 'POST',

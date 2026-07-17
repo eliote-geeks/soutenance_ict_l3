@@ -548,7 +548,7 @@ export default function SetupPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          University of Yaoundé I · Computer Science Dept. · Group P37
+          University of Yaoundé I · Computer Science Dept. · Groupe P35
         </p>
       </div>
     </div>

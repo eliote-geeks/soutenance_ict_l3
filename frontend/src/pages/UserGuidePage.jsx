@@ -387,7 +387,7 @@ const SECTIONS = [
         type: 'tips',
         items: [
           { type: 'info', text: 'Scheduled reports (Weekly Executive, Daily Threat) are display-only for now — auto-send is on the roadmap.' },
-          { type: 'tip',  text: 'Reports include your organisation header: University of Yaoundé I — Computer Science Dept. — Group P37.' },
+          { type: 'tip',  text: 'Reports include your organisation header: University of Yaoundé I — Computer Science Dept. — Groupe P35.' },
         ],
       },
     ],
@@ -846,7 +846,7 @@ export default function UserGuidePage() {
             Questions? Check <code className="bg-muted px-1.5 py-0.5 rounded text-xs">backend/.env</code> for configuration or open the <span className="text-primary font-medium">?</span> button on any page for contextual help.
           </p>
           <p className="text-xs text-muted-foreground/60 mt-2">
-            University of Yaoundé I · Computer Science Dept. · Group P37
+            University of Yaoundé I · Computer Science Dept. · Groupe P35
           </p>
         </div>
       )}

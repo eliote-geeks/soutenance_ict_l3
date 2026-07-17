@@ -178,7 +178,7 @@ BLOCKED_IPS = {"185.227.134.41"}
 TICKETS: list[dict[str, str]] = []
 AI_FINDINGS_BUFFER: list[dict[str, Any]] = []
 DEFAULT_PROFILES = [
-    {"id": "profile_admin", "name": "Admin P37", "type": "user", "description": "Primary administrator asset group"},
+    {"id": "profile_admin", "name": "Admin P35", "type": "user", "description": "Primary administrator asset group"},
     {"id": "profile_lab", "name": "Lab Blue Team", "type": "team", "description": "Shared classroom and lab systems"},
     {"id": "profile_dmz", "name": "DMZ Services", "type": "service", "description": "Public-facing perimeter systems"},
 ]

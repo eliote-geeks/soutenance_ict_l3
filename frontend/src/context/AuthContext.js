@@ -10,7 +10,7 @@ const STORAGE_KEYS = {
 const DEFAULT_USERS = [
   {
     id: 'user_admin',
-    name: 'Admin P37',
+    name: 'Admin P35',
     email: 'admin@uy1.local',
     role: 'admin',
     status: 'active',

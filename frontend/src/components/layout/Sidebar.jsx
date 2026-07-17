@@ -6,6 +6,7 @@ import {
   Server,
   Brain,
   Activity,
+  ShieldCheck,
   Shield,
   Bot,
   RotateCcw,
@@ -25,6 +26,7 @@ const navItems = [
   { path: '/incidents', icon: AlertTriangle,   label: 'Incidents',       badge: false },
   { path: '/hosts',     icon: Server,          label: 'Hosts',           badge: false },
   { path: '/agents',    icon: Bot,             label: 'Agents',          badge: false },
+  { path: '/resolution', icon: ShieldCheck,    label: 'Resolution',      badge: false },
   { path: '/model',     icon: Brain,           label: 'IA',              badge: false },
   { path: '/pipeline',  icon: Activity,        label: 'Sante',           badge: false },
 ];
@@ -136,7 +138,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         <div className="p-4 border-t border-border">
           <div className="text-xs text-muted-foreground space-y-0.5">
             <p className="font-medium text-foreground/80">UY1 - ICTD L3</p>
-            <p>Projet P37</p>
+            <p>Groupe P35</p>
           </div>
         </div>
       )}

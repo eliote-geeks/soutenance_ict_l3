@@ -36,7 +36,7 @@ const buildReportText = (type, dateRange, alerts, hosts) => {
     `Type       : ${type.toUpperCase()}`,
     `Date range : ${dateRange}`,
     `Generated  : ${now}`,
-    `Organisation: University of Yaoundé I — Computer Science Dept. — Group P37`,
+    `Organisation: University of Yaoundé I — Computer Science Dept. — Groupe P35`,
     sep,
     '',
     '1. ALERT SUMMARY',
