@@ -25,7 +25,7 @@ const navItems = [
   { path: '/',          icon: LayoutDashboard, label: 'Dashboard',       badge: false },
   { path: '/alerts',    icon: Bell,            label: 'Alerts & Intrusions', badge: true  },
   { path: '/incidents', icon: AlertTriangle,   label: 'Incidents',       badge: false },
-  { path: '/alerts',    icon: Network,         label: 'Traffic Analysis', badge: false },
+  { path: '/stream',    icon: Network,         label: 'Traffic Analysis', badge: false },
   { path: '/hosts',     icon: Server,          label: 'Hosts',           badge: false },
   { path: '/agents',    icon: Bot,             label: 'Agents',          badge: false },
   { path: '/resolution', icon: ShieldCheck,    label: 'Resolution',      badge: false },
