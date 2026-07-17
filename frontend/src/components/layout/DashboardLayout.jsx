@@ -7,14 +7,14 @@ export const DashboardLayout = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background cyber-grid topo-pattern noise-overlay">
+    <div className="min-h-screen bg-background">
       <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <TopBar sidebarCollapsed={sidebarCollapsed} />
       <main className={cn(
         "pt-16 min-h-screen transition-all duration-300",
         sidebarCollapsed ? "pl-[72px]" : "pl-64"
       )}>
-        <div className="p-6 relative z-10">
+        <div className="relative z-10 p-5">
           {children}
         </div>
       </main>

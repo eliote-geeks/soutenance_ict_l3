@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Sun, Moon, Bell, Settings, RefreshCw, Wifi, WifiOff, LogOut, User, Users, CheckCheck } from 'lucide-react';
+import { Sun, Moon, Bell, RefreshCw, Wifi, WifiOff, LogOut, CheckCheck } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -44,8 +42,6 @@ export const TopBar = ({ sidebarCollapsed }) => {
   const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isOnline, setIsOnline] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [environment, setEnvironment] = useState('prod');
   const [notifications, setNotifications] = useState([]);
   const [readIds, setReadIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('nst-read-notif') || '[]')); } catch { return new Set(); }
@@ -104,114 +100,88 @@ export const TopBar = ({ sidebarCollapsed }) => {
   const initials = user?.name
     ? user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
-  const isAdmin = user?.role === 'admin';
   const scopeProfiles = Array.isArray(options.profiles) ? options.profiles : [];
   const scopeAssets = Array.isArray(options.assets) ? options.assets : [];
 
   return (
     <header className={cn(
-      "fixed top-0 right-0 h-16 bg-card/80 backdrop-blur-md border-b border-border z-30 flex items-center gap-4 px-6 transition-all duration-300",
+      "fixed top-0 right-0 h-16 bg-card/90 backdrop-blur-md border-b border-border z-30 flex items-center gap-3 px-5 transition-all duration-300",
       sidebarCollapsed ? "left-[72px]" : "left-64"
     )}>
-      {/* Search */}
-      <div className="flex-1 max-w-xl relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Rechercher... (KQL: severity:critical AND source:firewall)"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-background/50 border-border/50 focus:bg-background transition-colors"
-        />
-      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div>
+          <div className="text-sm font-semibold leading-none">Supervision</div>
+          <div className="mt-1 text-xs text-muted-foreground">Donnees backend en direct</div>
+        </div>
 
-      {/* Filter chips */}
-      <div className="flex items-center gap-2">
-        <Select value={environment} onValueChange={setEnvironment}>
-          <SelectTrigger className="w-28 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="prod">Production</SelectItem>
-            <SelectItem value="dev">Developpement</SelectItem>
-            <SelectItem value="lab">Lab</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={scope.mode}
-          onValueChange={(value) => setScope((prev) => ({
-            ...prev,
-            mode: value,
-            profileId: value === 'profile' ? (prev.profileId || scopeProfiles[0]?.id || '') : '',
-            assetId: value === 'asset' ? (prev.assetId || scopeAssets[0]?.id || '') : '',
-          }))}
-        >
-          <SelectTrigger className="w-28 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les actifs</SelectItem>
-            <SelectItem value="profile">Profil</SelectItem>
-            <SelectItem value="asset">Asset</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {scope.mode === 'profile' && (
+        <div className="hidden items-center gap-2 md:flex">
           <Select
-            value={scope.profileId || (scopeProfiles[0]?.id ?? '')}
-            onValueChange={(value) => setScope((prev) => ({ ...prev, profileId: value }))}
+            value={scope.mode}
+            onValueChange={(value) => setScope((prev) => ({
+              ...prev,
+              mode: value,
+              profileId: value === 'profile' ? (prev.profileId || scopeProfiles[0]?.id || '') : '',
+              assetId: value === 'asset' ? (prev.assetId || scopeAssets[0]?.id || '') : '',
+            }))}
           >
-            <SelectTrigger className="w-44 h-8 text-xs">
-              <SelectValue placeholder="Select profile" />
+            <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {scopeProfiles.map((profile) => (
-                <SelectItem key={profile.id} value={profile.id}>
-                  {profile.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="all">Tous les actifs</SelectItem>
+              <SelectItem value="profile">Profil</SelectItem>
+              <SelectItem value="asset">Asset</SelectItem>
             </SelectContent>
           </Select>
-        )}
 
-        {scope.mode === 'asset' && (
-          <Select
-            value={scope.assetId || (scopeAssets[0]?.id ?? '')}
-            onValueChange={(value) => setScope((prev) => ({ ...prev, assetId: value }))}
-          >
-            <SelectTrigger className="w-44 h-8 text-xs">
-              <SelectValue placeholder="Select asset" />
-            </SelectTrigger>
-            <SelectContent>
-              {scopeAssets.map((asset) => (
-                <SelectItem key={asset.id} value={asset.id}>
-                  {asset.hostname}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+          {scope.mode === 'profile' && (
+            <Select
+              value={scope.profileId || (scopeProfiles[0]?.id ?? '')}
+              onValueChange={(value) => setScope((prev) => ({ ...prev, profileId: value }))}
+            >
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue placeholder="Profil" />
+              </SelectTrigger>
+              <SelectContent>
+                {scopeProfiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-        <Badge variant="outline" className="h-7 px-2.5 gap-1.5 cursor-pointer hover:bg-accent">
-          <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-          Critique
-        </Badge>
-        <Badge variant="outline" className="h-7 px-2.5 gap-1.5 cursor-pointer hover:bg-accent">
-          <span className="w-1.5 h-1.5 rounded-full bg-warning" />
-          Eleve
-        </Badge>
+          {scope.mode === 'asset' && (
+            <Select
+              value={scope.assetId || (scopeAssets[0]?.id ?? '')}
+              onValueChange={(value) => setScope((prev) => ({ ...prev, assetId: value }))}
+            >
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue placeholder="Actif" />
+              </SelectTrigger>
+              <SelectContent>
+                {scopeAssets.map((asset) => (
+                  <SelectItem key={asset.id} value={asset.id}>
+                    {asset.hostname}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {/* Status indicators */}
       <div className="flex items-center gap-3 ml-auto">
         {/* Live status */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
+        <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-1.5">
           {isOnline ? (
             <Wifi className="w-3.5 h-3.5 text-success" />
           ) : (
             <WifiOff className="w-3.5 h-3.5 text-destructive" />
           )}
-          <span className="text-xs font-mono font-medium text-success">ACTIF</span>
+          <span className="text-xs font-medium text-success">Actif</span>
         </div>
 
         {/* Last refresh */}
@@ -276,7 +246,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="justify-center text-xs text-primary font-medium" onClick={() => navigate('/alerts')}>
-              View all alerts →
+              Voir les alertes
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -306,22 +276,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/profile')}>
-              <User className="w-4 h-4" />
-              Profile
-            </DropdownMenuItem>
-            {isAdmin && (
-              <DropdownMenuItem onClick={() => navigate('/users')}>
-                <Users className="w-4 h-4" />
-                Users
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => navigate('/settings')}>
-              <Settings className="w-4 h-4" />
-              Settings
-            </DropdownMenuItem>
+            <DropdownMenuLabel>Session</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
@@ -330,7 +285,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
               }}
             >
               <LogOut className="w-4 h-4" />
-              Sign out
+              Deconnexion
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

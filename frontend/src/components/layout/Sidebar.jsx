@@ -1,17 +1,13 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Radio,
-  FileSearch,
   Bell,
   AlertTriangle,
   Server,
   Brain,
   Activity,
-  FileText,
   Shield,
   Bot,
-  BookOpen,
   RotateCcw,
   ChevronLeft,
   ChevronRight,
@@ -24,17 +20,13 @@ import { useAuth } from '@/context/AuthContext';
 // Removed: Network Flows (100% fake data), Risk Forecast (fake LSTM claims),
 //          Profile, Users, Settings (not relevant to IDPS demo)
 const navItems = [
-  { path: '/',          icon: LayoutDashboard, label: 'Tableau SOC',     badge: false },
-  { path: '/stream',    icon: Radio,           label: 'Flux telemetry',  badge: false },
-  { path: '/logs',      icon: FileSearch,      label: 'Logs Elastic',    badge: false },
+  { path: '/',          icon: LayoutDashboard, label: 'Dashboard',       badge: false },
   { path: '/alerts',    icon: Bell,            label: 'Alertes',         badge: true  },
   { path: '/incidents', icon: AlertTriangle,   label: 'Incidents',       badge: false },
-  { path: '/hosts',     icon: Server,          label: 'Actifs / Hosts',  badge: false },
+  { path: '/hosts',     icon: Server,          label: 'Hosts',           badge: false },
   { path: '/agents',    icon: Bot,             label: 'Agents',          badge: false },
-  { path: '/model',     icon: Brain,           label: 'Moteur IA',       badge: false },
-  { path: '/pipeline',  icon: Activity,        label: 'Sante stack',     badge: false },
-  { path: '/reports',   icon: FileText,        label: 'Rapports',        badge: false },
-  { path: '/guide',     icon: BookOpen,        label: 'User Guide',      badge: false },
+  { path: '/model',     icon: Brain,           label: 'IA',              badge: false },
+  { path: '/pipeline',  icon: Activity,        label: 'Sante',           badge: false },
 ];
 
 export const Sidebar = ({ collapsed, onToggle }) => {
@@ -72,7 +64,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
       {/* ── Navigation ───────────────────────────────────────────────────── */}
       <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
         {!isCollapsed && (
-          <p className="px-2 mb-2 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+          <p className="px-2 mb-2 text-[11px] uppercase text-muted-foreground/70">
             SOC
           </p>
         )}
@@ -119,8 +111,8 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         {/* ── Danger zone ──────────────────────────────────────────────────── */}
         <div className="mt-2 pt-2 border-t border-border/50">
           {!isCollapsed && (
-            <p className="px-2 mb-1 text-[11px] uppercase tracking-wide text-destructive/60">
-            Administration
+            <p className="px-2 mb-1 text-[11px] uppercase text-destructive/60">
+              Administration
             </p>
           )}
           <NavLink
@@ -143,9 +135,8 @@ export const Sidebar = ({ collapsed, onToggle }) => {
       {!isCollapsed && (
         <div className="p-4 border-t border-border">
           <div className="text-xs text-muted-foreground space-y-0.5">
-            <p className="font-medium text-foreground/80">University of Yaoundé I</p>
-            <p>ICTD L3 - Computer Science Dept.</p>
-            <p>Group P37</p>
+            <p className="font-medium text-foreground/80">UY1 - ICTD L3</p>
+            <p>Projet P37</p>
           </div>
         </div>
       )}
