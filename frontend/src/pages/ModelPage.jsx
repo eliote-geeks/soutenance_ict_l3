@@ -122,7 +122,7 @@ export default function ModelPage() {
           </p>
         </div>
         <Badge className="w-fit bg-primary/10 text-primary border-primary/20">
-          {ml.enabled ? 'ML active' : 'ML inactive'} · {modelName}
+          {ml.enabled ? 'ML active' : 'ML inactive'} · {modelName} · UI v2
         </Badge>
       </div>
 

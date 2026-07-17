@@ -62,8 +62,9 @@ app.use((req, res, next) => {
 });
 
 app.use('/static', express.static(path.join(buildDir, 'static'), {
-  immutable: true,
-  maxAge: '1y',
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store');
+  },
 }));
 
 app.use(express.static(buildDir, {
