@@ -22,6 +22,8 @@ import {
   AlertTriangle,
   Activity,
   ListChecks,
+  Eye,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -339,36 +341,44 @@ export default function AlertsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Alerts</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Signaux bruts detectes par les regles et l'IA. Objectif : qualifier vite, ouvrir un incident si necessaire, puis agir.
+          <h1 className="text-[28px] font-bold text-foreground">Alerts</h1>
+          <p className="mt-1 text-base text-muted-foreground">
+            {alerts.length} alertes detectees · <span className="text-destructive">{actionRequiredCount} a traiter en priorite</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="severity-critical gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-            {severityCounts.critical} Critical
-          </Badge>
-          <Badge variant="outline" className="severity-high gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-            {severityCounts.high} High
-          </Badge>
-          <Badge variant="outline" className="severity-medium gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-warning" />
-            {severityCounts.medium} Medium
-          </Badge>
-        </div>
+        <Button variant="outline" className="gap-2" onClick={() => window.location.reload()}>
+          <RefreshCw className="h-4 w-4" />
+          Actualiser
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard title="A traiter" value={openCount} icon={Bell} variant={openCount ? 'warning' : 'success'} delay={0} />
-        <KPICard title="Critiques / High" value={actionRequiredCount} icon={AlertTriangle} variant={actionRequiredCount ? 'danger' : 'success'} delay={80} />
-        <KPICard title="En investigation" value={investigatingCount} icon={Activity} variant="primary" delay={160} />
-        <KPICard title="Total signaux" value={alerts.length} icon={ListChecks} delay={240} />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-5">
+          <div className="font-mono text-3xl font-bold text-destructive">{severityCounts.critical}</div>
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="h-3 w-3 rounded-full bg-destructive" /> Critique
+          </div>
+        </div>
+        <div className="rounded-2xl border border-orange-300 bg-orange-50 p-5">
+          <div className="font-mono text-3xl font-bold text-orange-500">{severityCounts.high}</div>
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="h-3 w-3 rounded-full bg-orange-500" /> Haute
+          </div>
+        </div>
+        <div className="rounded-2xl border border-warning/25 bg-warning/10 p-5">
+          <div className="font-mono text-3xl font-bold text-warning">{severityCounts.medium}</div>
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="h-3 w-3 rounded-full bg-warning" /> Moyenne
+          </div>
+        </div>
+        <div className="rounded-2xl border border-success/25 bg-success/10 p-5">
+          <div className="font-mono text-3xl font-bold text-success">{severityCounts.low}</div>
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="h-3 w-3 rounded-full bg-success" /> Faible
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
@@ -436,111 +446,81 @@ export default function AlertsPage() {
 
       </div>
 
-      {/* Alerts List */}
-      <Card className="border-border/50 shadow-soft">
+      <Card className="overflow-hidden border-border/50">
         <CardContent className="p-0">
-          <div className="divide-y divide-border">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left">
+              <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-4 font-semibold">Type d'attaque</th>
+                  <th className="px-5 py-4 font-semibold">Source IP</th>
+                  <th className="px-5 py-4 font-semibold">Severite</th>
+                  <th className="px-5 py-4 font-semibold">Statut</th>
+                  <th className="px-5 py-4 font-semibold">Heure</th>
+                  <th className="px-5 py-4 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
             {filteredAlerts.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-                <Bell className="w-8 h-8 opacity-30" />
-                <p className="text-sm">No alerts match the current filters</p>
-              </div>
+              <tr>
+                <td colSpan={6} className="px-5 py-16 text-center text-sm text-muted-foreground">
+                  Aucune alerte ne correspond aux filtres.
+                </td>
+              </tr>
             )}
             {filteredAlerts.map((alert, index) => (
-              <div
+              <tr
                 key={alert.id}
-                className={cn(
-                  "flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors cursor-pointer",
-                  "opacity-0 animate-slide-up"
-                )}
+                className="cursor-pointer transition-colors hover:bg-muted/25"
                 style={{ animationDelay: `${index * 50}ms` }}
                 onClick={() => setSelectedAlert(alert)}
               >
-                {/* Severity indicator bar */}
-                <div className={cn(
-                  "w-1 h-12 rounded-full flex-shrink-0",
-                  alert.severity === 'critical' && "bg-destructive",
-                  alert.severity === 'high'     && "bg-destructive/70",
-                  alert.severity === 'medium'   && "bg-warning",
-                  alert.severity === 'low'      && "bg-primary",
-                )} />
-
-                {/* Alert info */}
-                <div className="flex-1 min-w-0">
-                  {/* Row 1: ID + severity + status + attack type + detector */}
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {alert.id}
-                    </span>
-                    <SeverityBadge severity={alert.severity} />
-                    <StatusBadge status={alert.status} />
-                    {/* Attack type — the main new addition */}
-                    <AttackTypeBadge title={alert.title} />
-                    {/* Detector */}
-                    <DetectorBadge title={alert.title} sourceType={alert.sourceType} />
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "h-10 w-1 rounded-full",
+                      alert.severity === 'critical' && "bg-destructive",
+                      alert.severity === 'high' && "bg-orange-500",
+                      alert.severity === 'medium' && "bg-warning",
+                      alert.severity === 'low' && "bg-success",
+                    )} />
+                    <div>
+                      <div className="font-medium text-foreground">{parseAttackType(alert.title).label}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{parseDetector(alert.title, alert.sourceType).label}</div>
+                    </div>
                   </div>
-
-                  {/* Row 2: Title */}
-                  <h3 className="font-medium text-foreground truncate">
-                    {alert.title}
-                  </h3>
-
-                  {/* Row 3: IPs + MITRE + confidence */}
-                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                    <span className="font-mono">{alert.sourceIP}</span>
-                    <span>→</span>
-                    <span>{alert.hostname}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span className="hidden sm:inline">{alert.mitreTactic}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span className="hidden sm:inline">
-                      Confidence {confidenceLabel(alert.confidence)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Assignee & Time */}
-                <div className="flex-shrink-0 text-right hidden md:block">
-                  <div className="flex items-center gap-2 justify-end mb-1">
-                    <User className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-sm">{alert.assignee || 'Unassigned'}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-1">
-                    {confidenceLabel(alert.confidence)}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
+                </td>
+                <td className="px-5 py-4">
+                  <div className="font-mono text-sm font-medium">{alert.sourceIP}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{alert.hostname}</div>
+                </td>
+                <td className="px-5 py-4">
+                  <SeverityBadge severity={alert.severity} />
+                  <div className="mt-1 text-xs text-muted-foreground">{confidenceLabel(alert.confidence)}</div>
+                </td>
+                <td className="px-5 py-4"><StatusBadge status={alert.status} /></td>
+                <td className="px-5 py-4">
+                  <span className="text-sm text-foreground">
                     {formatTimestamp(alert.timestamp)}
                   </span>
-                  {alert.eta && (
-                    <div className="text-xs text-primary mt-1">ETA: {alert.eta}</div>
-                  )}
-                </div>
-
-                {/* Actions dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="flex-shrink-0">
-                      <MoreHorizontal className="w-4 h-4" />
+                </td>
+                <td className="px-5 py-4">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedAlert(alert); }}>
+                      <Eye className="h-4 w-4" />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAcknowledge(alert.id); }}>
-                      <Check className="w-4 h-4 mr-2" />Acknowledge
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleIsolateHost(alert.hostname); }}>
-                      <Shield className="w-4 h-4 mr-2" />Isolate Host
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleBlockIP(alert); }}>
-                      <Ban className="w-4 h-4 mr-2" />Block IP
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCreateTicket(alert.id); }}>
-                      <Ticket className="w-4 h-4 mr-2" />Create Ticket
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                    <Button variant="ghost" size="icon" className="text-success" onClick={(e) => { e.stopPropagation(); handleAcknowledge(alert.id); }}>
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleBlockIP(alert); }}>
+                      <Ban className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
             ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

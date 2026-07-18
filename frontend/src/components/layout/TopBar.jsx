@@ -181,7 +181,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
           ) : (
             <WifiOff className="w-3.5 h-3.5 text-destructive" />
           )}
-          <span className="text-xs font-medium text-success">Actif</span>
+          <span className="text-xs font-medium text-success">LIVE</span>
         </div>
 
         {/* Last refresh */}

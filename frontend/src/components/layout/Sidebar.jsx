@@ -60,7 +60,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         {!isCollapsed && (
           <div className="animate-fade-in overflow-hidden">
             <h1 className="font-bold text-foreground leading-tight">NetSentinel AI</h1>
-            <span className="text-xs text-muted-foreground">SOC Elastic + IA</span>
+            <span className="text-xs text-muted-foreground">Detection System</span>
           </div>
         )}
       </div>
