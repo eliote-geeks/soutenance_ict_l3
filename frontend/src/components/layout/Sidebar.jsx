@@ -48,7 +48,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 h-screen bg-card border-r border-border z-40 flex flex-col transition-all duration-300',
+        'fixed left-0 top-0 h-screen bg-[#070d19] border-r border-cyan-950/80 z-40 flex flex-col transition-all duration-300',
         isCollapsed ? 'w-[72px]' : 'w-72'
       )}
     >
@@ -60,7 +60,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
         {!isCollapsed && (
           <div className="animate-fade-in overflow-hidden">
             <h1 className="font-bold text-foreground leading-tight">NetSentinel AI</h1>
-            <span className="text-xs text-muted-foreground">Detection System</span>
+            <span className="text-xs font-medium uppercase tracking-[0.18em] text-primary">Systeme de detection</span>
           </div>
         )}
       </div>
@@ -68,9 +68,9 @@ export const Sidebar = ({ collapsed, onToggle }) => {
       {/* ── Navigation ───────────────────────────────────────────────────── */}
       <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
         {!isCollapsed && (
-          <div className="mb-5 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
-            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-success" />
-            System Active
+          <div className="mb-6 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-bold uppercase text-success">
+            <span className="mr-2 inline-block h-3 w-3 rounded-full bg-success shadow-glow-teal" />
+            Systeme actif
           </div>
         )}
 

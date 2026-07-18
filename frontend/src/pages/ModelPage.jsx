@@ -23,7 +23,7 @@ const ruleMeta = {
   'SSH brute force': {
     icon: KeyRound,
     color: 'text-red-500',
-    bg: 'bg-red-50 border-red-200',
+    bg: 'bg-destructive/10 border-destructive/30',
     target: 'Tentatives SSH',
     condition: 'Plusieurs mots de passe SSH echouent depuis une meme IP.',
     thresholdKey: 'sshFailure',
@@ -32,7 +32,7 @@ const ruleMeta = {
   'DNS burst anomaly': {
     icon: Globe,
     color: 'text-cyan-600',
-    bg: 'bg-cyan-50 border-cyan-200',
+    bg: 'bg-primary/10 border-primary/30',
     target: 'DNS suspect',
     condition: 'Le volume DNS sort du comportement attendu.',
     thresholdKey: 'dnsAnomaly',
@@ -41,7 +41,7 @@ const ruleMeta = {
   'Port scan': {
     icon: ScanLine,
     color: 'text-blue-600',
-    bg: 'bg-blue-50 border-blue-200',
+    bg: 'bg-cyan-500/10 border-cyan-500/30',
     target: 'Scan de ports',
     condition: 'Une IP contacte plusieurs ports differents en peu de temps.',
     thresholdKey: 'portScanDistinctPorts',
@@ -50,7 +50,7 @@ const ruleMeta = {
   'ML anomaly': {
     icon: Brain,
     color: 'text-violet-600',
-    bg: 'bg-violet-50 border-violet-200',
+    bg: 'bg-purple-500/10 border-purple-500/30',
     target: 'Anomalie ML',
     condition: 'Le modele ML detecte un comportement hors profil normal.',
     thresholdKey: 'minSamples',
@@ -116,13 +116,13 @@ export default function ModelPage() {
     <div className="space-y-7 animate-fade-in">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Moteur de detection</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Regles de detection</h1>
           <p className="mt-2 text-base text-muted-foreground">
             Cette page montre comment NetSentinel AI transforme les logs Elastic en alertes et incidents.
           </p>
         </div>
         <Badge className="w-fit bg-primary/10 text-primary border-primary/20">
-          {ml.enabled ? 'ML active' : 'ML inactive'} · {modelName} · UI v2
+          {ml.enabled ? 'ML actif' : 'ML inactif'} · {modelName}
         </Badge>
       </div>
 
@@ -130,19 +130,19 @@ export default function ModelPage() {
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-5">
             <div className="font-mono text-3xl font-bold">{summary.rules}</div>
-            <div className="mt-1 text-sm text-muted-foreground">regles configurees</div>
+            <div className="mt-1 text-sm text-muted-foreground">detecteurs</div>
           </CardContent>
         </Card>
         <Card className="border-success/30 bg-success/5">
           <CardContent className="p-5">
             <div className="font-mono text-3xl font-bold">{summary.active}</div>
-            <div className="mt-1 text-sm text-muted-foreground">regles declenchees maintenant</div>
+            <div className="mt-1 text-sm text-muted-foreground">actifs</div>
           </CardContent>
         </Card>
         <Card className="border-warning/30 bg-warning/5">
           <CardContent className="p-5">
             <div className="font-mono text-3xl font-bold">{summary.signals}</div>
-            <div className="mt-1 text-sm text-muted-foreground">alertes produites</div>
+            <div className="mt-1 text-sm text-muted-foreground">signaux</div>
           </CardContent>
         </Card>
       </div>
@@ -185,7 +185,7 @@ export default function ModelPage() {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <div className={cn('rounded-xl border bg-white p-3', meta.color)}>
+                    <div className={cn('rounded-xl border bg-card p-3', meta.color)}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>

@@ -92,29 +92,29 @@ export default function OverviewPage() {
   return (
     <div className="space-y-7 animate-fade-in">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">SOC Overview</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Tableau de bord IDS</h1>
         <p className="mt-2 text-base text-muted-foreground">
-          Unified view of Filebeat, Packetbeat, fail2ban and AI detections
+          Vue temps reel des flux Elastic, alertes, incidents et sources suspectes.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-        <Stat icon={AlertTriangle} label="Total Alerts" value={kpis.totalAlerts} tone="warning" />
-        <Stat icon={Activity} label="Anomalies Detected" value={kpis.anomalies} tone="danger" />
+        <Stat icon={AlertTriangle} label="Alertes" value={kpis.totalAlerts} tone="warning" />
+        <Stat icon={Activity} label="Anomalies IA" value={kpis.anomalies} tone="danger" />
         <Stat icon={Shield} label="Incidents" value={kpis.incidentsOpen} tone="primary" />
-        <Stat icon={Globe} label="Suspicious IPs" value={suspiciousIps} tone="success" />
+        <Stat icon={Globe} label="IP suspectes" value={suspiciousIps} tone="success" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card className="xl:col-span-2 border-border/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle className="text-xl">Traffic Timeline (24h)</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Network activity by category</p>
+              <CardTitle className="text-xl">Trafic reseau sur 24h</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Evenements regroupes par categorie.</p>
             </div>
             <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
               <span className="h-3 w-3 rounded-full bg-success" />
-              Streaming
+              Direct
             </span>
           </CardHeader>
           <CardContent>
@@ -162,9 +162,9 @@ export default function OverviewPage() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Network className="h-5 w-5 text-destructive" />
-            Top Attacking IPs
+            Sources d'attaque
           </CardTitle>
-          <span className="text-sm text-muted-foreground">Last 24h</span>
+          <span className="text-sm text-muted-foreground">Dernieres 24h</span>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
@@ -176,7 +176,7 @@ export default function OverviewPage() {
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-2xl font-bold text-destructive">{item.attackCount}</div>
-                  <div className="text-sm text-muted-foreground">attacks</div>
+                  <div className="text-sm text-muted-foreground">alertes</div>
                 </div>
               </div>
             ))}

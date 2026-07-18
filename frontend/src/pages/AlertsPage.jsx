@@ -355,25 +355,25 @@ export default function AlertsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-5">
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5">
           <div className="font-mono text-3xl font-bold text-destructive">{severityCounts.critical}</div>
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <span className="h-3 w-3 rounded-full bg-destructive" /> Critique
           </div>
         </div>
-        <div className="rounded-2xl border border-orange-300 bg-orange-50 p-5">
+        <div className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-5">
           <div className="font-mono text-3xl font-bold text-orange-500">{severityCounts.high}</div>
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <span className="h-3 w-3 rounded-full bg-orange-500" /> Haute
           </div>
         </div>
-        <div className="rounded-2xl border border-warning/25 bg-warning/10 p-5">
+        <div className="rounded-2xl border border-warning/30 bg-warning/10 p-5">
           <div className="font-mono text-3xl font-bold text-warning">{severityCounts.medium}</div>
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <span className="h-3 w-3 rounded-full bg-warning" /> Moyenne
           </div>
         </div>
-        <div className="rounded-2xl border border-success/25 bg-success/10 p-5">
+        <div className="rounded-2xl border border-success/30 bg-success/10 p-5">
           <div className="font-mono text-3xl font-bold text-success">{severityCounts.low}</div>
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <span className="h-3 w-3 rounded-full bg-success" /> Faible
@@ -450,7 +450,7 @@ export default function AlertsPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left">
-              <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
+              <thead className="border-b border-cyan-950/80 bg-[#0b1424] text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-5 py-4 font-semibold">Type d'attaque</th>
                   <th className="px-5 py-4 font-semibold">Source IP</th>
@@ -460,7 +460,7 @@ export default function AlertsPage() {
                   <th className="px-5 py-4 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-cyan-950/80 bg-card">
             {filteredAlerts.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-5 py-16 text-center text-sm text-muted-foreground">

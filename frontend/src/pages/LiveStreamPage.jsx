@@ -98,9 +98,9 @@ export default function LiveStreamPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Telemetry Stream</h1>
+          <h1 className="text-2xl font-bold text-foreground">Analyse du trafic</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Live event feed from Packetbeat, Filebeat and fail2ban
+            Flux en direct depuis Packetbeat, Filebeat et fail2ban.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -108,7 +108,7 @@ export default function LiveStreamPage() {
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted border border-border">
             <Clock className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs font-mono text-muted-foreground">
-              {latency}ms latency
+              {latency}ms latence
             </span>
           </div>
           
@@ -116,7 +116,7 @@ export default function LiveStreamPage() {
           {buffer.length > 0 && (
             <Badge variant="outline" className="gap-1.5 bg-warning/10 text-warning border-warning/20">
               <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
-              {buffer.length} buffered
+              {buffer.length} en attente
             </Badge>
           )}
           
@@ -133,7 +133,7 @@ export default function LiveStreamPage() {
             {isPaused ? (
               <>
                 <Play className="w-4 h-4" />
-                Resume
+                Reprendre
               </>
             ) : (
               <>
@@ -147,37 +147,37 @@ export default function LiveStreamPage() {
 
       {/* Realtime Metrics Charts */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-border/50 shadow-soft">
+        <Card className="border-border/50 shadow-none">
           <CardContent className="pt-4">
             <RealtimeChart 
               metrics={metrics}
               dataKey="eventsPerSecond"
               color="hsl(var(--primary))"
-              label="Events/sec"
+              label="Evenements/s"
               height={150}
             />
           </CardContent>
         </Card>
         
-        <Card className="border-border/50 shadow-soft">
+        <Card className="border-border/50 shadow-none">
           <CardContent className="pt-4">
             <RealtimeChart 
               metrics={metrics}
               dataKey="bytesPerSecond"
               color="hsl(var(--chart-4))"
-              label="Bytes/sec"
+              label="Octets/s"
               height={150}
             />
           </CardContent>
         </Card>
         
-        <Card className="border-border/50 shadow-soft">
+        <Card className="border-border/50 shadow-none">
           <CardContent className="pt-4">
             <RealtimeChart 
               metrics={metrics}
               dataKey="failedLogins"
               color="hsl(var(--destructive))"
-              label="Failed Logins"
+              label="Echecs login"
               height={150}
             />
           </CardContent>
@@ -185,11 +185,11 @@ export default function LiveStreamPage() {
       </div>
 
       {/* Live Event Feed */}
-      <Card className="border-border/50 shadow-soft">
+      <Card className="border-border/50 shadow-none">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            Live Event Feed
+            Evenements reseau
           </CardTitle>
           <div className="flex items-center gap-2">
             <span className={cn(
@@ -197,7 +197,7 @@ export default function LiveStreamPage() {
               isPaused ? "bg-warning" : "bg-success pulse"
             )} />
             <span className="text-xs text-muted-foreground">
-              {isPaused ? 'Paused' : 'Streaming'}
+              {isPaused ? 'Pause' : 'Direct'}
             </span>
           </div>
         </CardHeader>
@@ -271,7 +271,7 @@ export default function LiveStreamPage() {
         <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Zap className="w-4 h-4" />
-            <span className="text-xs">Active Connections</span>
+            <span className="text-xs">Connexions actives</span>
           </div>
           <span className="text-2xl font-bold font-mono">
             {metrics.activeConnections?.toLocaleString() || 0}
@@ -280,7 +280,7 @@ export default function LiveStreamPage() {
         <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Activity className="w-4 h-4" />
-            <span className="text-xs">Queue Depth</span>
+            <span className="text-xs">File d'attente</span>
           </div>
           <span className="text-2xl font-bold font-mono">
             {metrics.queueDepth || 0}
@@ -289,7 +289,7 @@ export default function LiveStreamPage() {
         <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Clock className="w-4 h-4" />
-            <span className="text-xs">Avg Latency</span>
+            <span className="text-xs">Latence moy.</span>
           </div>
           <span className="text-2xl font-bold font-mono">
             {metrics.latency || 0}ms
@@ -298,7 +298,7 @@ export default function LiveStreamPage() {
         <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <RefreshCw className="w-4 h-4" />
-            <span className="text-xs">Events (5s)</span>
+            <span className="text-xs">Evenements (5s)</span>
           </div>
           <span className="text-2xl font-bold font-mono text-primary">
             {events.length}

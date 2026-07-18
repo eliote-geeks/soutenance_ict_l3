@@ -105,13 +105,13 @@ export const TopBar = ({ sidebarCollapsed }) => {
 
   return (
     <header className={cn(
-      "fixed top-0 right-0 h-16 bg-card/90 backdrop-blur-md border-b border-border z-30 flex items-center gap-3 px-5 transition-all duration-300",
+      "fixed top-0 right-0 h-16 bg-[#070d19]/95 backdrop-blur-md border-b border-cyan-950/80 z-30 flex items-center gap-3 px-5 transition-all duration-300",
       sidebarCollapsed ? "left-[72px]" : "left-72"
     )}>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div>
-          <div className="text-sm font-semibold leading-none">Supervision</div>
-          <div className="mt-1 text-xs text-muted-foreground">Donnees backend en direct</div>
+          <div className="text-sm font-semibold leading-none">IDS actif · Mode inline</div>
+          <div className="mt-1 text-xs text-muted-foreground">Interfaces: agents, Elasticsearch, IA</div>
         </div>
 
         <div className="hidden items-center gap-2 md:flex">

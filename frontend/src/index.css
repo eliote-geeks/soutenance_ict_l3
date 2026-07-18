@@ -78,60 +78,60 @@
   }
 
   .dark {
-    --background: 220 20% 8%;
-    --foreground: 40 25% 95%;
+    --background: 220 39% 6%;
+    --foreground: 210 40% 96%;
     
-    --card: 220 18% 12%;
-    --card-foreground: 40 25% 95%;
+    --card: 220 32% 10%;
+    --card-foreground: 210 40% 96%;
     
-    --popover: 220 18% 12%;
-    --popover-foreground: 40 25% 95%;
+    --popover: 220 34% 9%;
+    --popover-foreground: 210 40% 96%;
     
     /* Electric Teal - Primary */
-    --primary: 175 84% 45%;
-    --primary-foreground: 220 20% 8%;
-    --primary-light: 175 60% 20%;
-    --primary-glow: 175 84% 55%;
+    --primary: 184 98% 50%;
+    --primary-foreground: 220 39% 6%;
+    --primary-light: 184 80% 18%;
+    --primary-glow: 184 98% 58%;
     
     /* Safety Amber */
-    --warning: 38 92% 50%;
+    --warning: 28 96% 53%;
     --warning-foreground: 38 92% 12%;
     --warning-light: 38 50% 20%;
     
     /* Danger Red */
-    --destructive: 0 72% 55%;
+    --destructive: 0 91% 64%;
     --destructive-foreground: 0 0% 100%;
     --destructive-light: 0 50% 18%;
     
     /* Success Green */
-    --success: 142 71% 50%;
+    --success: 145 76% 48%;
     --success-foreground: 142 71% 10%;
     --success-light: 142 40% 18%;
     
     /* Secondary */
-    --secondary: 220 15% 18%;
-    --secondary-foreground: 40 20% 90%;
+    --secondary: 220 30% 13%;
+    --secondary-foreground: 210 32% 88%;
     
     /* Muted */
-    --muted: 220 15% 15%;
-    --muted-foreground: 220 10% 60%;
+    --muted: 220 28% 15%;
+    --muted-foreground: 220 24% 62%;
     
     /* Accent */
-    --accent: 175 30% 18%;
-    --accent-foreground: 175 84% 60%;
+    --accent: 188 70% 15%;
+    --accent-foreground: 184 98% 58%;
     
     /* Border & Input */
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
-    --ring: 175 84% 45%;
+    --border: 202 55% 18%;
+    --input: 202 55% 18%;
+    --ring: 184 98% 50%;
     
     /* Custom tokens */
-    --teal: 175 84% 45%;
-    --teal-dark: 175 84% 35%;
+    --teal: 184 98% 50%;
+    --teal-dark: 188 80% 32%;
     --amber: 38 92% 50%;
-    --ink: 40 25% 95%;
-    --sand: 220 20% 8%;
-    --sand-dark: 220 18% 12%;
+    --ink: 210 40% 96%;
+    --sand: 220 39% 6%;
+    --sand-dark: 220 32% 10%;
     
     /* Glass panel */
     --glass: 220 18% 15% / 0.8;
@@ -147,6 +147,11 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Manrope', sans-serif;
+    background-image:
+      radial-gradient(circle at top right, hsl(var(--primary) / 0.08), transparent 28%),
+      linear-gradient(hsl(var(--primary) / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.025) 1px, transparent 1px);
+    background-size: auto, 28px 28px, 28px 28px;
   }
   
   /* Typography */
@@ -349,14 +354,12 @@
   /* KPI Card styles */
   .kpi-card {
     @apply relative overflow-hidden rounded-xl border bg-card p-5 transition-all duration-300;
-    box-shadow: 0 2px 8px -2px hsl(var(--foreground) / 0.06),
-                0 4px 16px -4px hsl(var(--foreground) / 0.04);
+    box-shadow: none;
   }
   
   .kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px -2px hsl(var(--foreground) / 0.08),
-                0 8px 24px -4px hsl(var(--foreground) / 0.06);
+    transform: translateY(-1px);
+    border-color: hsl(var(--primary) / 0.35);
   }
   
   /* Status indicators */
@@ -425,7 +428,7 @@
   
   /* Sidebar styles */
   .sidebar-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground transition-all duration-200;
+    @apply flex items-center gap-3 px-3 py-3 rounded-xl text-muted-foreground transition-all duration-200;
   }
   
   .sidebar-item:hover {
@@ -433,7 +436,7 @@
   }
   
   .sidebar-item.active {
-    @apply bg-primary/10 text-primary font-medium;
+    @apply bg-primary/15 text-primary font-semibold border border-primary/30;
   }
   
   .sidebar-item.active::before {

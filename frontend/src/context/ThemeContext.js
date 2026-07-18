@@ -14,9 +14,9 @@ export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('elasticguard-theme');
-      return saved || 'light';
+      return saved || 'dark';
     }
-    return 'light';
+    return 'dark';
   });
 
   useEffect(() => {
