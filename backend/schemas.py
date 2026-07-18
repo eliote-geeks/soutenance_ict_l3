@@ -100,3 +100,14 @@ class AgentHeartbeatRequest(BaseModel):
     last_error: str | None = None
     signals: dict[str, Any] | None = None
     action_results: list[dict[str, Any]] | None = None
+
+
+class DetectionRuleCreateRequest(BaseModel):
+    name: str
+    attack_type: str = "Custom"
+    field: str = "message"
+    operator: str = "contains"
+    value: str
+    severity: str = "medium"
+    enabled: bool = True
+    description: str | None = None

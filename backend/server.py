@@ -67,8 +67,11 @@ from .elastic import (
     fetch_elastic_logs,
     fetch_elastic_alerts,
     fetch_packetbeat_events,
+    fetch_detection_rules,
     fetch_profile_asset_links,
     fetch_profiles_metadata,
+    store_detection_rule,
+    update_elastic_alert_status,
 )
 from .scope import (
     alert_signature,
@@ -90,6 +93,7 @@ from .schemas import (
     AgentHeartbeatRequest,
     AssetCreateRequest,
     BlockIPRequest,
+    DetectionRuleCreateRequest,
     ProfileAssetCreateRequest,
     ProfileCreateRequest,
     ReportExportRequest,
@@ -107,7 +111,7 @@ from .utils import iso, now_utc, normalize_text, parse_dt, percent_change
 from .ns_storage import storage_configured, storage_health
 from .ns_telemetry import telemetry_health
 from .ns_config import NETSENTINEL_STORAGE_BACKEND, NETSENTINEL_TELEMETRY_BACKEND
-from .ns_agent import pending_agent_actions, apply_agent_action_results, sanitize_agent_signals, build_local_action_policy, build_runtime_config
+from .ns_agent import pending_agent_actions, apply_agent_action_results, sanitize_agent_signals, build_local_action_policy, build_runtime_config, queue_agent_action
 from .ns_schemas import AgentInstanceActionRequest, AgentCommandCreateRequest
 
 # Request/Response models
@@ -673,7 +677,30 @@ async def model(profile_id: str | None = None, asset_id: str | None = None):
         filter_alerts_by_scope(current_alerts(), resolved_scope),
         filter_logs_by_scope(fetch_elastic_logs(), resolved_scope),
         filter_packet_events_by_scope(fetch_packetbeat_events(), resolved_scope),
+        fetch_detection_rules(),
     )
+
+
+@api_router.post("/detection-rules")
+async def create_detection_rule(request: DetectionRuleCreateRequest):
+    rule_id = f"rule_{uuid.uuid4().hex[:12]}"
+    document = {
+        "id": rule_id,
+        "name": normalize_text(request.name, "Custom rule"),
+        "attack_type": normalize_text(request.attack_type, "Custom"),
+        "field": normalize_text(request.field, "message"),
+        "operator": normalize_text(request.operator, "contains"),
+        "value": normalize_text(request.value, ""),
+        "severity": normalize_text(request.severity, "medium").lower(),
+        "enabled": request.enabled,
+        "description": normalize_text(request.description, ""),
+        "created_at": iso(now_utc()),
+    }
+    if not document["value"]:
+        raise HTTPException(status_code=400, detail="Rule value is required.")
+    stored = store_detection_rule(document) if storage_configured() else False
+    require_storage_write(stored, "Unable to persist detection rule to configured storage.")
+    return {"success": stored or not storage_configured(), "rule": document}
 
 
 @api_router.get("/predictions")
@@ -765,21 +792,62 @@ async def ingest_ai_finding(finding: AIFindingIngest):
 
 @api_router.post("/alerts/{alert_id}/acknowledge")
 async def acknowledge_alert(alert_id: str):
+    updated = update_elastic_alert_status(
+        alert_id,
+        "investigating",
+        {"acknowledged_at": iso(now_utc())},
+    ) if elastic_configured() else None
+    if updated:
+        return {"success": True, "alertId": alert_id, "status": "investigating", "storage": "elastic", "updated": updated}
     for alert in ALERTS:
         if alert["id"] == alert_id:
             alert["status"] = "investigating"
-            return {"success": True, "alertId": alert_id, "status": "investigating"}
-    return {"success": False, "alertId": alert_id}
+            return {"success": True, "alertId": alert_id, "status": "investigating", "storage": "memory"}
+    raise HTTPException(status_code=404, detail="Alert not found.")
 
 
 @api_router.post("/hosts/{host_id}/isolate")
 async def isolate_host(host_id: str):
+    normalized = normalize_text(host_id, "").lower()
+    for instance in fetch_agent_instances() if storage_configured() else []:
+        candidates = {
+            normalize_text(instance.get("id"), "").lower(),
+            normalize_text(instance.get("asset_id"), "").lower(),
+            normalize_text(instance.get("hostname"), "").lower(),
+        }
+        if normalized not in candidates:
+            continue
+        if normalize_text(instance.get("status"), "") not in {"approved", "active"}:
+            return {
+                "success": False,
+                "hostId": host_id,
+                "status": "agent_not_active",
+                "detail": "Un agent existe pour ce host mais il n'est pas approuve ou actif.",
+            }
+        action = queue_agent_action(
+            instance,
+            action_type="collect_triage",
+            reason=f"Isolation demandee depuis NetSentinel pour {host_id}",
+        )
+        elastic_index_doc(AGENT_INSTANCES_INDEX, instance.get("id"), instance)
+        return {
+            "success": True,
+            "hostId": host_id,
+            "status": "triage_queued",
+            "detail": "Action de triage mise en file sur l'agent. L'isolation reseau locale necessite une action agent dediee.",
+            "action": action,
+        }
     for host in HOSTS:
         if host["id"] == host_id or host["hostname"] == host_id:
             host["status"] = "offline"
             host["riskScore"] = min(host["riskScore"] + 5, 100)
-            return {"success": True, "hostId": host_id}
-    return {"success": False, "hostId": host_id}
+            return {"success": True, "hostId": host_id, "storage": "memory"}
+    return {
+        "success": False,
+        "hostId": host_id,
+        "status": "no_agent",
+        "detail": "Aucun agent actif ne permet d'isoler ce host depuis le backend.",
+    }
 
 
 @api_router.post("/firewall/block")

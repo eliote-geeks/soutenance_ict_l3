@@ -20,6 +20,7 @@ import HostsPage         from '@/pages/HostsPage';
 import AgentsPage        from '@/pages/AgentsPage';
 import ResolutionPage    from '@/pages/ResolutionPage';
 import ModelPage         from '@/pages/ModelPage';
+import NetworkMapPage    from '@/pages/NetworkMapPage';
 import PipelinePage      from '@/pages/PipelinePage';
 import ReportsPage       from '@/pages/ReportsPage';
 import UserGuidePage     from '@/pages/UserGuidePage';
@@ -74,6 +75,7 @@ function App() {
               <Route element={<SetupGuard><ProtectedLayout /></SetupGuard>}>
                 <Route path="/"          element={<OverviewPage />} />
                 <Route path="/stream"    element={<LiveStreamPage />} />
+                <Route path="/network"   element={<NetworkMapPage />} />
                 <Route path="/logs"      element={<LogsExplorerPage />} />
                 <Route path="/alerts"    element={<AlertsPage />} />
                 <Route path="/incidents" element={<IncidentsPage />} />
@@ -87,7 +89,6 @@ function App() {
                 <Route path="/reset"     element={<ResetPage />} />
 
                 {/* Redirect old routes to home instead of 404 */}
-                <Route path="/network"     element={<Navigate to="/" replace />} />
                 <Route path="/predictions" element={<Navigate to="/" replace />} />
                 <Route path="/profile"     element={<Navigate to="/" replace />} />
                 <Route path="/users"       element={<Navigate to="/" replace />} />

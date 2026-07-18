@@ -8,6 +8,7 @@ import {
   Database,
   Globe,
   KeyRound,
+  Plus,
   ScanLine,
   Shield,
 } from 'lucide-react';
@@ -15,7 +16,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
-import { fetchModel } from '@/lib/api';
+import { createDetectionRule, fetchModel } from '@/lib/api';
 import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
@@ -62,19 +63,41 @@ export default function ModelPage() {
   const { scopeKey } = useScope();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    attack_type: 'Brute Force / SSH',
+    field: 'title',
+    operator: 'contains',
+    value: '',
+    severity: 'medium',
+    enabled: true,
+  });
+
+  const loadData = async () => {
+    setData(await fetchModel());
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setData(await fetchModel());
-      } catch (error) {
-        console.error('Failed to load model data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+    loadData()
+      .catch((error) => console.error('Failed to load model data:', error))
+      .finally(() => setLoading(false));
   }, [scopeKey]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!form.name.trim() || !form.value.trim()) return;
+    setSaving(true);
+    try {
+      await createDetectionRule(form);
+      setForm((prev) => ({ ...prev, name: '', value: '' }));
+      await loadData();
+    } catch (error) {
+      console.error('Failed to create detection rule:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const summary = useMemo(() => {
     const detectors = data?.detectors || [];
@@ -113,11 +136,11 @@ export default function ModelPage() {
   };
 
   return (
-    <div className="space-y-7 animate-fade-in">
+    <div className="space-y-5 animate-fade-in text-sm">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Regles de detection</h1>
-          <p className="mt-2 text-base text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Regles de detection</h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             Cette page montre comment NetSentinel AI transforme les logs Elastic en alertes et incidents.
           </p>
         </div>
@@ -126,22 +149,22 @@ export default function ModelPage() {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-5">
-            <div className="font-mono text-3xl font-bold">{summary.rules}</div>
+            <div className="font-mono text-2xl font-bold">{summary.rules}</div>
             <div className="mt-1 text-sm text-muted-foreground">detecteurs</div>
           </CardContent>
         </Card>
         <Card className="border-success/30 bg-success/5">
           <CardContent className="p-5">
-            <div className="font-mono text-3xl font-bold">{summary.active}</div>
+            <div className="font-mono text-2xl font-bold">{summary.active}</div>
             <div className="mt-1 text-sm text-muted-foreground">actifs</div>
           </CardContent>
         </Card>
         <Card className="border-warning/30 bg-warning/5">
           <CardContent className="p-5">
-            <div className="font-mono text-3xl font-bold">{summary.signals}</div>
+            <div className="font-mono text-2xl font-bold">{summary.signals}</div>
             <div className="mt-1 text-sm text-muted-foreground">signaux</div>
           </CardContent>
         </Card>
@@ -175,6 +198,65 @@ export default function ModelPage() {
         </CardContent>
       </Card>
 
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-4">
+          <form onSubmit={handleSubmit} className="grid gap-3 lg:grid-cols-[1.1fr_1fr_0.8fr_0.8fr_1fr_0.7fr_auto] lg:items-end">
+            <label className="space-y-1">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">Nom</span>
+              <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: SSH root suspect" />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">Type</span>
+              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.attack_type} onChange={(e) => setForm({ ...form, attack_type: e.target.value })}>
+                <option>Brute Force / SSH</option>
+                <option>Port Scan</option>
+                <option>DoS / Connection Burst</option>
+                <option>Lateral Movement</option>
+                <option>DNS Tunnel / Anomaly</option>
+                <option>DNS Anomaly</option>
+                <option>Privilege Escalation</option>
+                <option>ML Anomaly (Unknown)</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">Champ</span>
+              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.field} onChange={(e) => setForm({ ...form, field: e.target.value })}>
+                <option value="title">title</option>
+                <option value="sourceIP">sourceIP</option>
+                <option value="hostname">hostname</option>
+                <option value="mitreTactic">mitreTactic</option>
+                <option value="message">message</option>
+                <option value="log.message">log.message</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">Operateur</span>
+              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.operator} onChange={(e) => setForm({ ...form, operator: e.target.value })}>
+                <option value="contains">contains</option>
+                <option value="equals">equals</option>
+                <option value="starts_with">starts_with</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">Valeur</span>
+              <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="ssh, dns, root..." />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">Severite</span>
+              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="critical">critical</option>
+              </select>
+            </label>
+            <Button type="submit" size="sm" disabled={saving || !form.name.trim() || !form.value.trim()} className="h-9 gap-2">
+              <Plus className="h-4 w-4" /> Ajouter
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {detectors.map((detector) => {
           const meta = ruleMeta[detector.name] || ruleMeta['ML anomaly'];
@@ -185,33 +267,33 @@ export default function ModelPage() {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <div className={cn('rounded-xl border bg-card p-3', meta.color)}>
-                      <Icon className="h-5 w-5" />
+                    <div className={cn('rounded-lg border bg-card p-2', meta.color)}>
+                      <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold">{detector.name}</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">{meta.condition}</p>
+                      <h2 className="text-base font-semibold">{detector.name}</h2>
+                      <p className="mt-1 text-xs text-muted-foreground">{detector.custom ? detector.rule : meta.condition}</p>
                     </div>
                   </div>
                   <Badge className={hits > 0 ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground'}>
-                    {hits > 0 ? 'Declenchee' : 'Calme'}
+                    {detector.custom && !detector.enabled ? 'Inactive' : (hits > 0 ? 'Declenchee' : 'Calme')}
                   </Badge>
                 </div>
 
                 <div className="mt-5 grid grid-cols-3 gap-3">
                   <div className="rounded-lg border bg-card p-3">
                     <div className="text-xs text-muted-foreground">Surveille</div>
-                    <div className="mt-1 text-sm font-medium">{meta.target}</div>
+                    <div className="mt-1 text-xs font-medium">{detector.custom ? detector.attackType : meta.target}</div>
                   </div>
                   <div className="rounded-lg border bg-card p-3">
                     <div className="text-xs text-muted-foreground">Declenchement</div>
-                    <div className="mt-1 font-mono text-sm font-semibold">
+                    <div className="mt-1 font-mono text-xs font-semibold">
                       {thresholdFor(meta)} {meta.thresholdLabel}
                     </div>
                   </div>
                   <div className="rounded-lg border bg-card p-3">
                     <div className="text-xs text-muted-foreground">Alertes</div>
-                    <div className="mt-1 font-mono text-lg font-bold">{hits}</div>
+                    <div className="mt-1 font-mono text-base font-bold">{hits}</div>
                   </div>
                 </div>
               </CardContent>

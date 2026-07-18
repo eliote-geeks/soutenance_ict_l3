@@ -222,7 +222,40 @@ def derive_incidents(alerts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return incidents
 
 
-def derive_model_metrics(alerts: list[dict[str, Any]], logs: list[dict[str, Any]], packet_events: list[dict[str, Any]]) -> dict[str, Any]:
+def _custom_rule_matches(rule: dict[str, Any], alerts: list[dict[str, Any]], logs: list[dict[str, Any]]) -> int:
+    field = normalize_text(rule.get("field"), "message")
+    operator = normalize_text(rule.get("operator"), "contains").lower()
+    expected = normalize_text(rule.get("value"), "").lower()
+    if not expected:
+        return 0
+
+    rows: list[dict[str, Any]] = []
+    if field.startswith("alert."):
+        rows = alerts
+        field = field.removeprefix("alert.")
+    elif field.startswith("log."):
+        rows = logs
+        field = field.removeprefix("log.")
+    else:
+        rows = [*alerts, *logs]
+
+    count = 0
+    for row in rows:
+        fields = row.get("fields") or {}
+        raw = row.get(field)
+        if raw is None:
+            raw = fields.get(field)
+        actual = normalize_text(raw, "").lower()
+        if operator == "equals" and actual == expected:
+            count += 1
+        elif operator == "starts_with" and actual.startswith(expected):
+            count += 1
+        elif operator == "contains" and expected in actual:
+            count += 1
+    return count
+
+
+def derive_model_metrics(alerts: list[dict[str, Any]], logs: list[dict[str, Any]], packet_events: list[dict[str, Any]], custom_rules: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     ai_runtime = fetch_ai_runtime_status()
     title_counts: dict[str, int] = {}
     for alert in alerts:
@@ -235,6 +268,28 @@ def derive_model_metrics(alerts: list[dict[str, Any]], logs: list[dict[str, Any]
         {"name": "dns_error_findings", "importance": sum(count for title, count in title_counts.items() if "dns" in title.lower()) / total_alerts, "trend": "up"},
         {"name": "high_severity_ratio", "importance": len([item for item in alerts if normalize_text(item.get("severity"), "medium") in {"high", "critical"}]) / total_alerts, "trend": "stable"},
     ]
+    detectors = [
+        {"name": "SSH brute force", "rule": "failed passwords over threshold", "matches": sum(count for title, count in title_counts.items() if "ssh" in title.lower())},
+        {"name": "DNS burst anomaly", "rule": "dns errors over threshold", "matches": sum(count for title, count in title_counts.items() if "dns" in title.lower())},
+        {"name": "Port scan", "rule": "distinct destination ports over threshold", "matches": sum(count for title, count in title_counts.items() if "port scan" in title.lower())},
+        {"name": "ML anomaly", "rule": "isolation forest outlier on live feature window", "matches": sum(count for title, count in title_counts.items() if "ml network anomaly" in title.lower())},
+    ]
+    for rule in custom_rules or []:
+        detectors.append(
+            {
+                "id": rule.get("id"),
+                "name": rule.get("name"),
+                "rule": f"{rule.get('field')} {rule.get('operator')} {rule.get('value')}",
+                "matches": _custom_rule_matches(rule, alerts, logs) if rule.get("enabled", True) else 0,
+                "custom": True,
+                "enabled": rule.get("enabled", True),
+                "severity": rule.get("severity", "medium"),
+                "attackType": rule.get("attack_type", "Custom"),
+                "description": rule.get("description"),
+                "createdAt": rule.get("created_at"),
+            }
+        )
+
     return {
         "versions": [
             {
@@ -249,12 +304,7 @@ def derive_model_metrics(alerts: list[dict[str, Any]], logs: list[dict[str, Any]
         ],
         "features": features,
         "confusionMatrix": None,
-        "detectors": [
-            {"name": "SSH brute force", "rule": "failed passwords over threshold", "matches": sum(count for title, count in title_counts.items() if "ssh" in title.lower())},
-            {"name": "DNS burst anomaly", "rule": "dns errors over threshold", "matches": sum(count for title, count in title_counts.items() if "dns" in title.lower())},
-            {"name": "Port scan", "rule": "distinct destination ports over threshold", "matches": sum(count for title, count in title_counts.items() if "port scan" in title.lower())},
-            {"name": "ML anomaly", "rule": "isolation forest outlier on live feature window", "matches": sum(count for title, count in title_counts.items() if "ml network anomaly" in title.lower())},
-        ],
+        "detectors": detectors,
         "drift": min(0.99, len(alerts) / max(len(packet_events), 1)),
         "latencyMs": 40 + min(len(packet_events), 100),
         "thresholds": (ai_runtime.get("thresholds") if isinstance(ai_runtime, dict) else None) or {},

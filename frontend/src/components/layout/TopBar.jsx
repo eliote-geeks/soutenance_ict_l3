@@ -105,7 +105,7 @@ export const TopBar = ({ sidebarCollapsed }) => {
 
   return (
     <header className={cn(
-      "fixed top-0 right-0 h-16 bg-[#070d19]/95 backdrop-blur-md border-b border-cyan-950/80 z-30 flex items-center gap-3 px-5 transition-all duration-300",
+      "fixed top-0 right-0 h-16 bg-card/95 dark:bg-[#070d19]/95 backdrop-blur-md border-b border-border dark:border-cyan-950/80 z-30 flex items-center gap-3 px-5 transition-all duration-300",
       sidebarCollapsed ? "left-[72px]" : "left-72"
     )}>
       <div className="flex min-w-0 flex-1 items-center gap-3">

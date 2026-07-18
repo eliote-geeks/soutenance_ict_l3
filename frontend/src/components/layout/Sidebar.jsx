@@ -13,19 +13,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Network,
+  NetworkIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
 // ─── Pages kept after review ────────────────────────────────────────────────
-// Removed: Network Flows (100% fake data), Risk Forecast (fake LSTM claims),
-//          Profile, Users, Settings (not relevant to IDPS demo)
+// Removed: Risk Forecast (fake LSTM claims), Profile, Users, Settings
+//          (not relevant to IDPS demo)
 const navItems = [
   { path: '/',          icon: LayoutDashboard, label: 'Dashboard',       badge: false },
   { path: '/alerts',    icon: Bell,            label: 'Alerts & Intrusions', badge: true  },
   { path: '/incidents', icon: AlertTriangle,   label: 'Incidents',       badge: false },
   { path: '/stream',    icon: Network,         label: 'Traffic Analysis', badge: false },
+  { path: '/network',   icon: NetworkIcon,     label: 'Carte reseau',    badge: false },
   { path: '/hosts',     icon: Server,          label: 'Hosts',           badge: false },
   { path: '/agents',    icon: Bot,             label: 'Agents',          badge: false },
   { path: '/resolution', icon: ShieldCheck,    label: 'Resolution',      badge: false },
@@ -48,7 +50,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 h-screen bg-[#070d19] border-r border-cyan-950/80 z-40 flex flex-col transition-all duration-300',
+        'fixed left-0 top-0 h-screen bg-card dark:bg-[#070d19] border-r border-border dark:border-cyan-950/80 z-40 flex flex-col transition-all duration-300',
         isCollapsed ? 'w-[72px]' : 'w-72'
       )}
     >

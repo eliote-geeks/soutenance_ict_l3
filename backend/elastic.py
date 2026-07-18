@@ -16,8 +16,9 @@ from .config import (
     PROFILES_INDEX,
     ASSETS_INDEX,
     PROFILE_ASSETS_INDEX,
+    DETECTION_RULES_INDEX,
 )
-from .utils import iso, normalize_text, parse_dt, parse_es_timestamp
+from .utils import iso, normalize_text, now_utc, parse_dt, parse_es_timestamp
 
 
 def elastic_configured() -> bool:
@@ -316,6 +317,36 @@ def fetch_elastic_alerts() -> list[dict]:
     return alerts
 
 
+def update_elastic_alert_status(alert_id: str, status: str, extra: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    payload = {
+        "size": 1,
+        "query": {
+            "bool": {
+                "should": [
+                    {"term": {"alert_id.keyword": alert_id}},
+                    {"term": {"alert_id": alert_id}},
+                    {"ids": {"values": [alert_id]}},
+                ],
+                "minimum_should_match": 1,
+            }
+        },
+    }
+    result = elastic_request("GET", f"/{AI_ALERTS_INDEX}/_search", payload)
+    hit = (((result or {}).get("hits") or {}).get("hits") or [None])[0]
+    if not hit:
+        return None
+    update_doc = {"status": status, "updated_at": iso(now_utc())}
+    update_doc.update(extra or {})
+    updated = elastic_request(
+        "POST",
+        f"/{hit.get('_index')}/_update/{hit.get('_id')}?refresh=wait_for",
+        {"doc": update_doc},
+    )
+    if not updated:
+        return None
+    return {"index": hit.get("_index"), "id": hit.get("_id"), **update_doc}
+
+
 def fetch_ai_runtime_status() -> dict[str, Any]:
     targets = []
     if AI_SERVICE_URL:
@@ -363,3 +394,11 @@ def fetch_assets_metadata() -> list[dict[str, Any]]:
 
 def fetch_profile_asset_links() -> list[dict[str, Any]]:
     return fetch_index_documents(PROFILE_ASSETS_INDEX)
+
+
+def fetch_detection_rules() -> list[dict[str, Any]]:
+    return fetch_index_documents(DETECTION_RULES_INDEX, size=200)
+
+
+def store_detection_rule(rule: dict[str, Any]) -> bool:
+    return elastic_index_doc(DETECTION_RULES_INDEX, rule["id"], rule)

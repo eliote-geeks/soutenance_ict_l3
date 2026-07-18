@@ -29,6 +29,7 @@ PROFILE_ASSETS_INDEX = os.environ.get("PROFILE_ASSETS_INDEX", "netsentinel-profi
 AGENT_TOKENS_INDEX = os.environ.get("AGENT_TOKENS_INDEX", "netsentinel-agent-enrollment-tokens")
 AGENT_INSTANCES_INDEX = os.environ.get("AGENT_INSTANCES_INDEX", "netsentinel-agent-instances")
 IP_BLOCKS_INDEX = os.environ.get("IP_BLOCKS_INDEX", "netsentinel-ip-blocks")
+DETECTION_RULES_INDEX = os.environ.get("DETECTION_RULES_INDEX", "netsentinel-detection-rules")
 
 # Reponse automatique : blocage temporaire des IP a l'origine d'une menace
 # critique. La duree limitee est un garde-fou contre les faux positifs.

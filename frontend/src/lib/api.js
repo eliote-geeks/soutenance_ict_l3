@@ -125,6 +125,12 @@ export const fetchHosts = async () => fetchJson('/hosts');
 
 export const fetchModel = async () => fetchJson('/model');
 
+export const createDetectionRule = async (payload) => fetchJson('/detection-rules', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
+});
+
 export const fetchPredictions = async () => fetchJson('/predictions');
 
 export const fetchPipeline = async () => fetchJson('/pipeline');
