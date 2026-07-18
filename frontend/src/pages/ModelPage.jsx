@@ -2,15 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
-  ArrowRight,
   Brain,
-  CheckCircle,
+  CheckCircle2,
   Database,
+  Filter,
   Globe,
   KeyRound,
   Plus,
   ScanLine,
+  Search,
   Shield,
+  SlidersHorizontal,
+  X,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,43 +23,38 @@ import { createDetectionRule, fetchModel } from '@/lib/api';
 import { useScope } from '@/context/ScopeContext';
 import { cn } from '@/lib/utils';
 
-const ruleMeta = {
-  'SSH brute force': {
-    icon: KeyRound,
-    color: 'text-red-500',
-    bg: 'bg-destructive/10 border-destructive/30',
-    target: 'Tentatives SSH',
-    condition: 'Plusieurs mots de passe SSH echouent depuis une meme IP.',
-    thresholdKey: 'sshFailure',
-    thresholdLabel: 'echecs',
-  },
-  'DNS burst anomaly': {
-    icon: Globe,
-    color: 'text-cyan-600',
-    bg: 'bg-primary/10 border-primary/30',
-    target: 'DNS suspect',
-    condition: 'Le volume DNS sort du comportement attendu.',
-    thresholdKey: 'dnsAnomaly',
-    thresholdLabel: 'erreurs',
-  },
-  'Port scan': {
-    icon: ScanLine,
-    color: 'text-blue-600',
-    bg: 'bg-cyan-500/10 border-cyan-500/30',
-    target: 'Scan de ports',
-    condition: 'Une IP contacte plusieurs ports differents en peu de temps.',
-    thresholdKey: 'portScanDistinctPorts',
-    thresholdLabel: 'ports',
-  },
-  'ML anomaly': {
-    icon: Brain,
-    color: 'text-violet-600',
-    bg: 'bg-purple-500/10 border-purple-500/30',
-    target: 'Anomalie ML',
-    condition: 'Le modele ML detecte un comportement hors profil normal.',
-    thresholdKey: 'minSamples',
-    thresholdLabel: 'echantillons',
-  },
+const systemRuleMeta = {
+  'SSH brute force': { icon: KeyRound, family: 'Brute Force / SSH', query: 'failed password >= threshold', severity: 'high' },
+  'DNS burst anomaly': { icon: Globe, family: 'DNS Anomaly', query: 'dns errors >= threshold', severity: 'medium' },
+  'Port scan': { icon: ScanLine, family: 'Port Scan', query: 'distinct destination ports >= threshold', severity: 'medium' },
+  'ML anomaly': { icon: Brain, family: 'ML Anomaly (Unknown)', query: 'Isolation Forest outlier', severity: 'high' },
+};
+
+const attackTypes = [
+  'Brute Force / SSH',
+  'Port Scan',
+  'DoS / Connection Burst',
+  'Lateral Movement',
+  'DNS Tunnel / Anomaly',
+  'DNS Anomaly',
+  'Privilege Escalation',
+  'ML Anomaly (Unknown)',
+];
+
+const severityClass = {
+  critical: 'border-destructive/30 bg-destructive/10 text-destructive',
+  high: 'border-orange-500/30 bg-orange-500/10 text-orange-500',
+  medium: 'border-warning/30 bg-warning/10 text-warning',
+  low: 'border-success/30 bg-success/10 text-success',
+};
+
+const RuleIcon = ({ detector }) => {
+  const Icon = systemRuleMeta[detector.name]?.icon || SlidersHorizontal;
+  return (
+    <span className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-muted/40 text-primary">
+      <Icon className="h-3.5 w-3.5" />
+    </span>
+  );
 };
 
 export default function ModelPage() {
@@ -64,6 +62,9 @@ export default function ModelPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [form, setForm] = useState({
     name: '',
     attack_type: 'Brute Force / SSH',
@@ -79,10 +80,51 @@ export default function ModelPage() {
   };
 
   useEffect(() => {
+    setLoading(true);
     loadData()
       .catch((error) => console.error('Failed to load model data:', error))
       .finally(() => setLoading(false));
   }, [scopeKey]);
+
+  const detectors = useMemo(() => data?.detectors || [], [data]);
+  const ml = data?.ml || {};
+  const modelName = data?.versions?.[0]?.version || 'hybrid-detection';
+
+  const rows = useMemo(() => (
+    detectors.map((detector) => {
+      const meta = systemRuleMeta[detector.name] || {};
+      const severity = detector.severity || meta.severity || 'medium';
+      const family = detector.attackType || meta.family || 'Custom';
+      const query = detector.rule || meta.query || 'custom condition';
+      const matches = Number(detector.matches || 0);
+      return {
+        ...detector,
+        family,
+        query,
+        severity,
+        matches,
+        status: detector.custom && detector.enabled === false ? 'disabled' : 'enabled',
+        source: detector.custom ? 'Custom' : 'System',
+      };
+    })
+  ), [detectors]);
+
+  const filteredRows = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      const matchesSearch = !needle || [row.name, row.family, row.query, row.severity, row.source]
+        .some((value) => String(value || '').toLowerCase().includes(needle));
+      const matchesType = typeFilter === 'all' || row.family === typeFilter;
+      return matchesSearch && matchesType;
+    });
+  }, [rows, search, typeFilter]);
+
+  const summary = useMemo(() => ({
+    total: rows.length,
+    enabled: rows.filter((rule) => rule.status === 'enabled').length,
+    custom: rows.filter((rule) => rule.custom).length,
+    signals: rows.reduce((sum, rule) => sum + rule.matches, 0),
+  }), [rows]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -91,6 +133,7 @@ export default function ModelPage() {
     try {
       await createDetectionRule(form);
       setForm((prev) => ({ ...prev, name: '', value: '' }));
+      setPanelOpen(false);
       await loadData();
     } catch (error) {
       console.error('Failed to create detection rule:', error);
@@ -99,18 +142,9 @@ export default function ModelPage() {
     }
   };
 
-  const summary = useMemo(() => {
-    const detectors = data?.detectors || [];
-    return {
-      rules: detectors.length,
-      active: detectors.filter((rule) => Number(rule.matches || 0) > 0).length,
-      signals: detectors.reduce((sum, rule) => sum + Number(rule.matches || 0), 0),
-    };
-  }, [data]);
-
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <LoadingSkeleton variant="card" />
         <LoadingSkeleton variant="table" />
       </div>
@@ -120,206 +154,226 @@ export default function ModelPage() {
   if (!data) {
     return (
       <Card>
-        <CardContent className="p-6 text-sm text-destructive">Regles de detection indisponibles.</CardContent>
+        <CardContent className="p-5 text-sm text-destructive">Regles de detection indisponibles.</CardContent>
       </Card>
     );
   }
 
-  const detectors = data.detectors || [];
-  const thresholds = data.thresholds || {};
-  const ml = data.ml || {};
-  const modelName = data.versions?.[0]?.version || 'hybrid-detection';
-
-  const thresholdFor = (meta) => {
-    if (meta.thresholdKey === 'minSamples') return ml.minSamples ?? '--';
-    return thresholds[meta.thresholdKey] ?? '--';
-  };
-
   return (
-    <div className="space-y-5 animate-fade-in text-sm">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="space-y-4 animate-fade-in text-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Regles de detection</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Cette page montre comment NetSentinel AI transforme les logs Elastic en alertes et incidents.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Detection rules</h1>
+          <p className="mt-1 text-xs text-muted-foreground">Regles systeme et personnalisees executees sur les donnees Elastic.</p>
         </div>
-        <Badge className="w-fit bg-primary/10 text-primary border-primary/20">
-          {ml.enabled ? 'ML actif' : 'ML inactif'} · {modelName}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="border-primary/20 bg-primary/10 text-primary">
+            {ml.enabled ? 'ML actif' : 'ML inactif'} · {modelName}
+          </Badge>
+          <Button size="sm" className="h-8 gap-2" onClick={() => setPanelOpen(true)}>
+            <Plus className="h-4 w-4" /> New rule
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-5">
-            <div className="font-mono text-2xl font-bold">{summary.rules}</div>
-            <div className="mt-1 text-sm text-muted-foreground">detecteurs</div>
-          </CardContent>
-        </Card>
-        <Card className="border-success/30 bg-success/5">
-          <CardContent className="p-5">
-            <div className="font-mono text-2xl font-bold">{summary.active}</div>
-            <div className="mt-1 text-sm text-muted-foreground">actifs</div>
-          </CardContent>
-        </Card>
-        <Card className="border-warning/30 bg-warning/5">
-          <CardContent className="p-5">
-            <div className="font-mono text-2xl font-bold">{summary.signals}</div>
-            <div className="mt-1 text-sm text-muted-foreground">signaux</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          ['Total rules', summary.total, Database],
+          ['Enabled', summary.enabled, CheckCircle2],
+          ['Custom', summary.custom, SlidersHorizontal],
+          ['Signals', summary.signals, Activity],
+        ].map(([label, value, Icon]) => (
+          <Card key={label}>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
+                <div className="mt-1 font-mono text-xl font-semibold">{value}</div>
+              </div>
+              <Icon className="h-4 w-4 text-primary" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <Card className="border-border/60">
-        <CardContent className="grid gap-4 p-5 lg:grid-cols-[1fr_auto_1fr_auto_1fr] lg:items-center">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-primary/10 p-2 text-primary"><Database className="h-4 w-4" /></div>
-            <div>
-              <div className="font-semibold">Entree</div>
-              <div className="text-sm text-muted-foreground">Logs Filebeat, Packetbeat, Metricbeat et agents.</div>
+      <Card>
+        <CardContent className="p-0">
+          <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative max-w-xl flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search rules by name, type, query, severity..."
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <select
+                className="h-9 rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary"
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value)}
+              >
+                <option value="all">All rule types</option>
+                {attackTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
             </div>
           </div>
-          <ArrowRight className="hidden h-5 w-5 text-muted-foreground lg:block" />
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-xs">
+              <thead className="border-b border-border bg-muted/30 text-[11px] uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Rule</th>
+                  <th className="px-4 py-3 font-medium">Type</th>
+                  <th className="px-4 py-3 font-medium">Severity</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Query / condition</th>
+                  <th className="px-4 py-3 text-right font-medium">Matches</th>
+                  <th className="px-4 py-3 font-medium">Source</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredRows.map((row) => (
+                  <tr key={row.id || row.name} className="hover:bg-muted/30">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <RuleIcon detector={row} />
+                        <div>
+                          <div className="font-medium">{row.name}</div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">{row.custom ? 'User managed rule' : 'Built-in detector'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{row.family}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline" className={cn('capitalize', severityClass[row.severity] || severityClass.medium)}>
+                        {row.severity}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]',
+                        row.status === 'enabled'
+                          ? 'border-success/30 bg-success/10 text-success'
+                          : 'border-border bg-muted text-muted-foreground'
+                      )}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        {row.status}
+                      </span>
+                    </td>
+                    <td className="max-w-md px-4 py-3">
+                      <code className="block truncate rounded bg-muted/50 px-2 py-1 font-mono text-[11px] text-muted-foreground">{row.query}</code>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold">{row.matches}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{row.source}</td>
+                  </tr>
+                ))}
+                {filteredRows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No rules match the current filters.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="grid gap-3 p-4 md:grid-cols-3">
           <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-warning/10 p-2 text-warning"><Shield className="h-4 w-4" /></div>
+            <Database className="mt-0.5 h-4 w-4 text-primary" />
             <div>
-              <div className="font-semibold">Traitement</div>
-              <div className="text-sm text-muted-foreground">Regles de securite + Isolation Forest.</div>
+              <div className="font-medium">Input</div>
+              <div className="mt-1 text-xs text-muted-foreground">Filebeat, Packetbeat, Metricbeat, agents.</div>
             </div>
           </div>
-          <ArrowRight className="hidden h-5 w-5 text-muted-foreground lg:block" />
           <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-success/10 p-2 text-success"><CheckCircle className="h-4 w-4" /></div>
+            <Shield className="mt-0.5 h-4 w-4 text-warning" />
             <div>
-              <div className="font-semibold">Sortie</div>
-              <div className="text-sm text-muted-foreground">Alertes visibles, puis regroupement en incidents.</div>
+              <div className="font-medium">Evaluation</div>
+              <div className="mt-1 text-xs text-muted-foreground">Rules, thresholds, ML anomaly scoring.</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
+            <div>
+              <div className="font-medium">Output</div>
+              <div className="mt-1 text-xs text-muted-foreground">Alerts and incidents for investigation.</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-4">
-          <form onSubmit={handleSubmit} className="grid gap-3 lg:grid-cols-[1.1fr_1fr_0.8fr_0.8fr_1fr_0.7fr_auto] lg:items-end">
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium uppercase text-muted-foreground">Nom</span>
-              <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: SSH root suspect" />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium uppercase text-muted-foreground">Type</span>
-              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.attack_type} onChange={(e) => setForm({ ...form, attack_type: e.target.value })}>
-                <option>Brute Force / SSH</option>
-                <option>Port Scan</option>
-                <option>DoS / Connection Burst</option>
-                <option>Lateral Movement</option>
-                <option>DNS Tunnel / Anomaly</option>
-                <option>DNS Anomaly</option>
-                <option>Privilege Escalation</option>
-                <option>ML Anomaly (Unknown)</option>
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium uppercase text-muted-foreground">Champ</span>
-              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.field} onChange={(e) => setForm({ ...form, field: e.target.value })}>
-                <option value="title">title</option>
-                <option value="sourceIP">sourceIP</option>
-                <option value="hostname">hostname</option>
-                <option value="mitreTactic">mitreTactic</option>
-                <option value="message">message</option>
-                <option value="log.message">log.message</option>
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium uppercase text-muted-foreground">Operateur</span>
-              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.operator} onChange={(e) => setForm({ ...form, operator: e.target.value })}>
-                <option value="contains">contains</option>
-                <option value="equals">equals</option>
-                <option value="starts_with">starts_with</option>
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium uppercase text-muted-foreground">Valeur</span>
-              <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="ssh, dns, root..." />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium uppercase text-muted-foreground">Severite</span>
-              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs outline-none focus:border-primary" value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="critical">critical</option>
-              </select>
-            </label>
-            <Button type="submit" size="sm" disabled={saving || !form.name.trim() || !form.value.trim()} className="h-9 gap-2">
-              <Plus className="h-4 w-4" /> Ajouter
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      {panelOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-sm">
+          <div className="h-full w-full max-w-md border-l border-border bg-card shadow-none">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <div className="font-semibold">Create detection rule</div>
+                <div className="mt-1 text-xs text-muted-foreground">Persisted in Elasticsearch and applied to this page.</div>
+              </div>
+              <button className="rounded-md p-1 hover:bg-muted" onClick={() => setPanelOpen(false)} aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        {detectors.map((detector) => {
-          const meta = ruleMeta[detector.name] || ruleMeta['ML anomaly'];
-          const Icon = meta.icon;
-          const hits = Number(detector.matches || 0);
-          return (
-            <Card key={detector.name} className={cn('border', meta.bg)}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className={cn('rounded-lg border bg-card p-2', meta.color)}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-semibold">{detector.name}</h2>
-                      <p className="mt-1 text-xs text-muted-foreground">{detector.custom ? detector.rule : meta.condition}</p>
-                    </div>
-                  </div>
-                  <Badge className={hits > 0 ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground'}>
-                    {detector.custom && !detector.enabled ? 'Inactive' : (hits > 0 ? 'Declenchee' : 'Calme')}
-                  </Badge>
-                </div>
-
-                <div className="mt-5 grid grid-cols-3 gap-3">
-                  <div className="rounded-lg border bg-card p-3">
-                    <div className="text-xs text-muted-foreground">Surveille</div>
-                    <div className="mt-1 text-xs font-medium">{detector.custom ? detector.attackType : meta.target}</div>
-                  </div>
-                  <div className="rounded-lg border bg-card p-3">
-                    <div className="text-xs text-muted-foreground">Declenchement</div>
-                    <div className="mt-1 font-mono text-xs font-semibold">
-                      {thresholdFor(meta)} {meta.thresholdLabel}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border bg-card p-3">
-                    <div className="text-xs text-muted-foreground">Alertes</div>
-                    <div className="mt-1 font-mono text-base font-bold">{hits}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      <Card className="border-border/60">
-        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="font-semibold">Suite logique</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Une regle declenchee cree une alerte. Plusieurs alertes liees deviennent un incident a traiter.
-            </p>
+            <form onSubmit={handleSubmit} className="space-y-4 p-5">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">Name</span>
+                <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="SSH root suspect" />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">Rule type</span>
+                <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary" value={form.attack_type} onChange={(event) => setForm({ ...form, attack_type: event.target.value })}>
+                  {attackTypes.map((type) => <option key={type}>{type}</option>)}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium">Field</span>
+                  <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary" value={form.field} onChange={(event) => setForm({ ...form, field: event.target.value })}>
+                    <option value="title">title</option>
+                    <option value="sourceIP">sourceIP</option>
+                    <option value="hostname">hostname</option>
+                    <option value="mitreTactic">mitreTactic</option>
+                    <option value="message">message</option>
+                    <option value="log.message">log.message</option>
+                  </select>
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium">Operator</span>
+                  <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary" value={form.operator} onChange={(event) => setForm({ ...form, operator: event.target.value })}>
+                    <option value="contains">contains</option>
+                    <option value="equals">equals</option>
+                    <option value="starts_with">starts_with</option>
+                  </select>
+                </label>
+              </div>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">Value</span>
+                <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} placeholder="ssh, dns, root..." />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">Severity</span>
+                <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary" value={form.severity} onChange={(event) => setForm({ ...form, severity: event.target.value })}>
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                  <option value="critical">critical</option>
+                </select>
+              </label>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setPanelOpen(false)}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={saving || !form.name.trim() || !form.value.trim()}>
+                  {saving ? 'Saving...' : 'Create rule'}
+                </Button>
+              </div>
+            </form>
           </div>
-          <div className="flex gap-3">
-            <Button asChild>
-              <a href="/alerts"><AlertTriangle className="mr-2 h-4 w-4" />Voir Alertes</a>
-            </Button>
-            <Button asChild variant="outline">
-              <a href="/incidents">Voir Incidents</a>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }
