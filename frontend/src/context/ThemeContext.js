@@ -13,7 +13,13 @@ export const useTheme = () => {
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
+      const themeVersion = localStorage.getItem('netsentinel-theme-version');
       const saved = localStorage.getItem('elasticguard-theme');
+      if (themeVersion !== 'dark-ids-v1') {
+        localStorage.setItem('netsentinel-theme-version', 'dark-ids-v1');
+        localStorage.setItem('elasticguard-theme', 'dark');
+        return 'dark';
+      }
       return saved || 'dark';
     }
     return 'dark';
